@@ -14,6 +14,7 @@ type AuthContextValue = {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  patchSessionUser: (next: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -55,9 +56,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const patchSessionUser = useCallback((next: Partial<User>) => {
+    setUser((current) => {
+      if (!current) return current;
+      const updated = { ...current, ...next };
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const stored = JSON.parse(raw) as StoredAuth;
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...stored, user: updated })
+        );
+      }
+      return updated;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ user, token, login, logout }),
-    [user, token, login, logout]
+    () => ({ user, token, login, logout, patchSessionUser }),
+    [user, token, login, logout, patchSessionUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

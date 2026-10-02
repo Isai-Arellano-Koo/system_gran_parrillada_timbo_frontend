@@ -3,8 +3,10 @@ export type UserRole = "admin" | "mesero" | "cocinero";
 export type User = {
   id: number;
   name: string;
+  username?: string | null;
   email: string;
   role: UserRole;
+  is_active?: boolean;
 };
 
 export type AuthResponse = {

@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { AppLayout } from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
@@ -9,9 +10,12 @@ import { DishesPage } from "./pages/DishesPage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { KitchenPage } from "./pages/KitchenPage";
+import { UsersPage } from "./pages/UsersPage";
+import { UserFormPage } from "./pages/UserFormPage";
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -26,6 +30,9 @@ export default function App() {
                 <Route path="/ingredients" element={<IngredientsPage />} />
                 <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="/users/nuevo" element={<UserFormPage />} />
+                <Route path="/users/:id" element={<UserFormPage />} />
               </Route>
               <Route
                 element={<ProtectedRoute roles={["admin", "mesero"]} />}
@@ -46,5 +53,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

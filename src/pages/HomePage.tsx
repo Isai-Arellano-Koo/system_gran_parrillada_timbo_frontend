@@ -77,6 +77,9 @@ export function HomePage() {
               <Link className="btn btn-ghost" to="/inventory">
                 Inventario
               </Link>
+              <Link className="btn btn-ghost" to="/users">
+                Usuarios
+              </Link>
             </>
           )}
         </div>

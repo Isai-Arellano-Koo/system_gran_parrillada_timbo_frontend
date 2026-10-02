@@ -11,6 +11,45 @@ import type {
   User,
 } from "../types";
 
+export const usersApi = {
+  list: (token: string) => apiRequest<User[]>("/api/users", { token }),
+  get: (token: string, id: number) =>
+    apiRequest<User>(`/api/users/${id}`, { token }),
+  create: (
+    token: string,
+    body: {
+      name: string;
+      username: string;
+      email: string;
+      password: string;
+      role: User["role"];
+      is_active: boolean;
+    }
+  ) =>
+    apiRequest<User>("/api/users", {
+      method: "POST",
+      token,
+      body,
+    }),
+  update: (
+    token: string,
+    id: number,
+    body: Partial<{
+      name: string;
+      username: string;
+      email: string;
+      password: string;
+      role: User["role"];
+      is_active: boolean;
+    }>
+  ) =>
+    apiRequest<User>(`/api/users/${id}`, {
+      method: "PATCH",
+      token,
+      body,
+    }),
+};
+
 export const authApi = {
   login: (email: string, password: string) =>
     apiRequest<AuthResponse>("/api/auth/login", {

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -27,15 +28,20 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
+      <div className="login-theme">
+        <ThemeToggle />
+      </div>
       <form className="login-card stack" onSubmit={onSubmit}>
-        <div>
-          <h1>
-            Gran Parrillada <span>Timbó</span>
-          </h1>
-          <p className="lead">
-            Ingresa con tu usuario para gestionar pedidos, cocina e inventario.
-          </p>
+        <div className="login-brand">
+          <div className="brand-logo">GT</div>
+          <div>
+            <h1>Gran Timbó</h1>
+            <p className="brand-sub">Restaurante</p>
+          </div>
         </div>
+        <p className="lead">
+          Ingresa con tu correo para gestionar pedidos, cocina e inventario.
+        </p>
 
         {error ? <div className="alert alert-error">{error}</div> : null}
 
