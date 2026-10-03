@@ -124,6 +124,15 @@ export const inventoryApi = {
       token,
       body,
     }),
+  adjustStock: (
+    token: string,
+    body: { ingredient_id: number; stock_current: number; reason?: string }
+  ) =>
+    apiRequest("/api/inventory/adjustments", {
+      method: "POST",
+      token,
+      body,
+    }),
   listMovements: (token: string) =>
     apiRequest<InventoryMovement[]>("/api/inventory/movements", { token }),
   listAlerts: (token: string) =>

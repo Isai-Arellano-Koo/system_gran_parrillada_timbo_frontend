@@ -4,19 +4,31 @@ import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Dish, Ingredient } from "../types";
 
+type RecipeRow = { ingredient_id: string; quantity: string };
+
+const emptyRow = (): RecipeRow => ({ ingredient_id: "", quantity: "" });
+
+function rowsFromDish(dish: Dish): RecipeRow[] {
+  const rows = (dish.recipe_items || []).map((item) => ({
+    ingredient_id: String(item.ingredient_id),
+    quantity: String(item.quantity),
+  }));
+  return rows.length ? rows : [emptyRow()];
+}
+
 export function DishesPage() {
   const { token } = useAuth();
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedDish, setSelectedDish] = useState<number | "">("");
-  const [recipeRows, setRecipeRows] = useState([
-    { ingredient_id: "", quantity: "" },
-  ]);
+  const [active, setActive] = useState(true);
+  const [recipeRows, setRecipeRows] = useState<RecipeRow[]>([emptyRow()]);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     if (!token) return;
@@ -25,7 +37,7 @@ export function DishesPage() {
       catalogApi.listIngredients(token),
     ]);
     setDishes(dishList);
-    setIngredients(ingredientList.filter((i) => i.is_active));
+    setIngredients(ingredientList);
   };
 
   useEffect(() => {
@@ -34,76 +46,136 @@ export function DishesPage() {
     );
   }, [token]);
 
-  const createDish = async (e: FormEvent) => {
+  const resetForm = () => {
+    setEditingId(null);
+    setName("");
+    setPrice("");
+    setDescription("");
+    setActive(true);
+    setRecipeRows([emptyRow()]);
+  };
+
+  const startEdit = (dish: Dish) => {
+    setError("");
+    setOk("");
+    setEditingId(dish.id);
+    setName(dish.name);
+    setPrice(String(Number(dish.price)));
+    setDescription(dish.description || "");
+    setActive(dish.is_active);
+    setRecipeRows(rowsFromDish(dish));
+  };
+
+  const updateRow = (index: number, patch: Partial<RecipeRow>) => {
+    setRecipeRows((rows) =>
+      rows.map((row, i) => (i === index ? { ...row, ...patch } : row))
+    );
+  };
+
+  const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setError("");
     setOk("");
+
+    const filled = recipeRows.filter((row) => row.ingredient_id || row.quantity);
+    const incomplete = filled.some((row) => !row.ingredient_id || !row.quantity);
+    if (incomplete) {
+      setError("Cada línea de la receta necesita ingrediente y cantidad");
+      return;
+    }
+
+    const items = filled.map((row) => ({
+      ingredient_id: Number(row.ingredient_id),
+      quantity: Number(row.quantity),
+    }));
+    const ids = items.map((item) => item.ingredient_id);
+    if (new Set(ids).size !== ids.length) {
+      setError("No se puede repetir un ingrediente en la misma receta");
+      return;
+    }
+
+    setSaving(true);
     try {
-      await catalogApi.createDish(token, {
-        name,
-        price: Number(price),
-        description,
-      });
-      setName("");
-      setPrice("");
-      setDescription("");
-      setOk("Plato registrado");
+      if (editingId) {
+        await catalogApi.updateDish(token, editingId, {
+          name: name.trim(),
+          price: Number(price),
+          description: description.trim(),
+          is_active: active,
+        });
+        await catalogApi.setRecipe(token, editingId, items);
+        setOk("Plato y receta actualizados");
+      } else {
+        const created = await catalogApi.createDish(token, {
+          name: name.trim(),
+          price: Number(price),
+          description: description.trim(),
+        });
+        if (!active) {
+          await catalogApi.updateDish(token, created.id, { is_active: false });
+        }
+        if (items.length) {
+          await catalogApi.setRecipe(token, created.id, items);
+        }
+        setOk("Plato registrado");
+        resetForm();
+      }
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar");
-    }
-  };
-
-  const saveRecipe = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!token || !selectedDish) return;
-    setError("");
-    setOk("");
-    try {
-      const items = recipeRows
-        .filter((r) => r.ingredient_id && r.quantity)
-        .map((r) => ({
-          ingredient_id: Number(r.ingredient_id),
-          quantity: Number(r.quantity),
-        }));
-      await catalogApi.setRecipe(token, Number(selectedDish), items);
-      setOk("Receta asociada al plato");
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar la receta");
+    } finally {
+      setSaving(false);
     }
   };
 
   const toggleDish = async (dish: Dish) => {
     if (!token) return;
+    setError("");
+    setOk("");
     try {
       await catalogApi.updateDish(token, dish.id, { is_active: !dish.is_active });
+      if (editingId === dish.id) setActive(!dish.is_active);
+      setOk(dish.is_active ? "Plato desactivado" : "Plato activado");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar");
     }
   };
 
+  const ingredientChoices = (selectedId: string) =>
+    ingredients.filter(
+      (item) => item.is_active || String(item.id) === selectedId
+    );
+
   return (
     <div>
       <div className="page-head">
         <div>
-          <h1>Platos y recetas</h1>
-          <p>HU04 / HU05 — Catálogo de platos y consumo por receta.</p>
+          <h1>Carta</h1>
+          <p>Edita cada plato y asocia o cambia los ingredientes de su receta.</p>
         </div>
+        {editingId ? (
+          <button type="button" className="btn btn-ghost" onClick={resetForm}>
+            Nuevo plato
+          </button>
+        ) : null}
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {ok ? <div className="alert alert-ok">{ok}</div> : null}
 
-      <div className="grid-2">
-        <section className="panel">
-          <h2>Nuevo plato</h2>
-          <form className="form-grid" onSubmit={createDish}>
+      <section className="panel">
+        <h2>{editingId ? "Editar plato" : "Nuevo plato"}</h2>
+        <form className="form-grid" onSubmit={save}>
+          <div className="form-row">
             <label>
               Nombre
-              <input value={name} onChange={(e) => setName(e.target.value)} required />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </label>
             <label>
               Precio (S/)
@@ -116,97 +188,105 @@ export function DishesPage() {
                 required
               />
             </label>
-            <label>
-              Descripción
-              <textarea
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-            <button className="btn btn-primary" type="submit">
-              Guardar plato
-            </button>
-          </form>
-        </section>
+          </div>
+          <label>
+            Descripción
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
 
-        <section className="panel">
-          <h2>Asociar receta</h2>
-          <form className="form-grid" onSubmit={saveRecipe}>
-            <label>
-              Plato
-              <select
-                value={selectedDish}
-                onChange={(e) =>
-                  setSelectedDish(e.target.value ? Number(e.target.value) : "")
-                }
-                required
-              >
-                <option value="">Seleccionar...</option>
-                {dishes.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="status-row">
+            <div>
+              <strong>Receta</strong>
+              <p>Ingredientes que se descuentan del inventario al confirmar el pedido.</p>
+            </div>
+          </div>
 
-            {recipeRows.map((row, idx) => (
-              <div className="form-row" key={idx}>
-                <label>
-                  Ingrediente
-                  <select
-                    value={row.ingredient_id}
-                    onChange={(e) => {
-                      const next = [...recipeRows];
-                      next[idx] = { ...next[idx], ingredient_id: e.target.value };
-                      setRecipeRows(next);
-                    }}
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    {ingredients.map((ing) => (
-                      <option key={ing.id} value={ing.id}>
-                        {ing.name} ({ing.unit})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Cantidad
-                  <input
-                    type="number"
-                    min="0.001"
-                    step="0.001"
-                    value={row.quantity}
-                    onChange={(e) => {
-                      const next = [...recipeRows];
-                      next[idx] = { ...next[idx], quantity: e.target.value };
-                      setRecipeRows(next);
-                    }}
-                    required
-                  />
-                </label>
-              </div>
-            ))}
-
-            <div className="actions">
+          {recipeRows.map((row, index) => (
+            <div className="recipe-row" key={index}>
+              <label>
+                Ingrediente
+                <select
+                  value={row.ingredient_id}
+                  onChange={(e) =>
+                    updateRow(index, { ingredient_id: e.target.value })
+                  }
+                >
+                  <option value="">Seleccionar...</option>
+                  {ingredientChoices(row.ingredient_id).map((ing) => (
+                    <option key={ing.id} value={ing.id}>
+                      {ing.name} ({ing.unit})
+                      {ing.is_active ? "" : " · inactivo"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cantidad
+                <input
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  value={row.quantity}
+                  onChange={(e) => updateRow(index, { quantity: e.target.value })}
+                  placeholder="0.000"
+                />
+              </label>
               <button
                 type="button"
                 className="btn btn-ghost"
                 onClick={() =>
-                  setRecipeRows([...recipeRows, { ingredient_id: "", quantity: "" }])
+                  setRecipeRows((rows) =>
+                    rows.length === 1 ? [emptyRow()] : rows.filter((_, i) => i !== index)
+                  )
                 }
               >
-                + Ingrediente
-              </button>
-              <button className="btn btn-primary" type="submit">
-                Guardar receta
+                Quitar
               </button>
             </div>
-          </form>
-        </section>
-      </div>
+          ))}
+
+          <div className="actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setRecipeRows((rows) => [...rows, emptyRow()])}
+            >
+              + Ingrediente
+            </button>
+          </div>
+
+          <label className={`switch${active ? " on" : ""}`}>
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />
+            <span className="switch-ui" />
+            <span className="switch-label">
+              {active ? "Activo en la carta" : "Fuera de la carta"}
+            </span>
+          </label>
+
+          <div className="form-footer">
+            {editingId ? (
+              <button type="button" className="btn btn-ghost" onClick={resetForm}>
+                Cancelar
+              </button>
+            ) : null}
+            <button className="btn btn-primary" type="submit" disabled={saving}>
+              {saving
+                ? "Guardando..."
+                : editingId
+                  ? "Guardar cambios"
+                  : "Guardar plato"}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <section className="panel">
         <h2>Catálogo</h2>
@@ -224,34 +304,55 @@ export function DishesPage() {
             <tbody>
               {dishes.map((dish) => (
                 <tr key={dish.id}>
-                  <td>{dish.name}</td>
+                  <td>
+                    <strong>{dish.name}</strong>
+                    {dish.description ? (
+                      <div className="hint">{dish.description}</div>
+                    ) : null}
+                  </td>
                   <td>S/ {Number(dish.price).toFixed(2)}</td>
                   <td>
-                    {(dish.recipe_items || [])
-                      .map(
-                        (r) =>
-                          `${r.ingredient?.name || r.ingredient_id} (${r.quantity})`
-                      )
-                      .join(", ") || "Sin receta"}
+                    {(dish.recipe_items || []).length
+                      ? (dish.recipe_items || [])
+                          .map(
+                            (item) =>
+                              `${item.ingredient?.name || item.ingredient_id} (${Number(item.quantity)} ${item.ingredient?.unit || ""})`
+                          )
+                          .join(", ")
+                      : "Sin receta"}
                   </td>
                   <td>
-                    <span className={`badge ${dish.is_active ? "badge-ok" : "badge-danger"}`}>
+                    <span
+                      className={`badge ${dish.is_active ? "badge-ok" : "badge-danger"}`}
+                    >
                       {dish.is_active ? "Activo" : "Inactivo"}
                     </span>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => toggleDish(dish)}
-                    >
-                      {dish.is_active ? "Desactivar" : "Activar"}
-                    </button>
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => startEdit(dish)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => toggleDish(dish)}
+                      >
+                        {dish.is_active ? "Desactivar" : "Activar"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {dishes.length === 0 ? (
+            <div className="empty">Aún no hay platos en la carta</div>
+          ) : null}
         </div>
       </section>
     </div>

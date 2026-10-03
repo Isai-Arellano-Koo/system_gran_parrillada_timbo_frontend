@@ -315,6 +315,13 @@ button {
   gap: 0.75rem;
 }
 
+.recipe-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
 label,
 .field {
   display: grid;
@@ -793,6 +800,7 @@ button.badge:disabled {
   .grid-2,
   .grid-3,
   .form-row,
+  .recipe-row,
   .user-layout {
     grid-template-columns: 1fr;
   }
