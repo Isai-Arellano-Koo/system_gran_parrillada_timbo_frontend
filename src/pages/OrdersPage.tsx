@@ -151,7 +151,7 @@ export function OrdersPage() {
       <div className="page-head">
         <div>
           <h1>Pedidos</h1>
-          <p>HU06–HU09 / HU13 — Abrir, armar, validar, confirmar o cancelar.</p>
+          <p>Abre un pedido, arma los platos, valida el stock y confírmalo o cancélalo.</p>
         </div>
       </div>
 

@@ -57,7 +57,7 @@ export function InventoryPage() {
       <div className="page-head">
         <div>
           <h1>Inventario</h1>
-          <p>HU03 / HU14 / HU15 — Entradas, movimientos y alertas.</p>
+          <p>Registra entradas, revisa los movimientos y las alertas de stock.</p>
         </div>
       </div>
 

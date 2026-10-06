@@ -62,7 +62,7 @@ export function KitchenPage() {
       <div className="page-head">
         <div>
           <h1>Cocina</h1>
-          <p>HU10 / HU11 — Comandas confirmadas y avance de preparación.</p>
+          <p>Comandas confirmadas y avance de la preparación.</p>
         </div>
       </div>
 
