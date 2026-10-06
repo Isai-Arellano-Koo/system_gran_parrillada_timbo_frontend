@@ -33,11 +33,8 @@ export function LoginPage() {
       </div>
       <form className="login-card stack" onSubmit={onSubmit}>
         <div className="login-brand">
-          <div className="brand-logo">GT</div>
-          <div>
-            <h1>Gran Timbó</h1>
-            <p className="brand-sub">Restaurante</p>
-          </div>
+          <h1>Gran Timbó</h1>
+          <p className="brand-sub">Restaurante</p>
         </div>
         <p className="lead">
           Ingresa con tu correo para gestionar pedidos, cocina e inventario.

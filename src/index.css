@@ -101,23 +101,7 @@ button {
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
   padding: 0.35rem 0.55rem 0.4rem;
-}
-
-.brand-logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: white;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -705,9 +689,8 @@ button.badge:disabled {
 }
 
 .login-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  display: grid;
+  gap: 0.15rem;
 }
 
 .login-brand h1 {
@@ -718,6 +701,7 @@ button.badge:disabled {
 }
 
 .login-brand .brand-sub {
+  margin: 0;
   color: var(--muted);
   letter-spacing: 0.12em;
 }

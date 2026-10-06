@@ -28,11 +28,8 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-logo">GT</div>
-          <div>
-            <div className="brand-mark">Gran Timbó</div>
-            <div className="brand-sub">Restaurante</div>
-          </div>
+          <div className="brand-mark">Gran Timbó</div>
+          <div className="brand-sub">Restaurante</div>
         </div>
 
         <nav className="nav-list">
