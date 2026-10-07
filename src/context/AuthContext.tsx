@@ -12,7 +12,7 @@ import type { User } from "../types";
 type AuthContextValue = {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
   patchSessionUser: (next: Partial<User>) => void;
 };
@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(stored?.token ?? null);
   const [user, setUser] = useState<User | null>(stored?.user ?? null);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await authApi.login(email, password);
+  const login = useCallback(async (identifier: string, password: string) => {
+    const result = await authApi.login(identifier, password);
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ token: result.accessToken, user: result.user })

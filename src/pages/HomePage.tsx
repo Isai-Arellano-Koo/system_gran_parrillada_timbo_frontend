@@ -10,7 +10,7 @@ export function HomePage() {
   const [alerts, setAlerts] = useState(0);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || user?.role === "cajero") return;
     const load = async () => {
       try {
         const [orderList, ticketList] = await Promise.all([

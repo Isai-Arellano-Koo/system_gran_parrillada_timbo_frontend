@@ -33,19 +33,19 @@ export function LoginPage() {
       </div>
       <form className="login-card stack" onSubmit={onSubmit}>
         <div className="login-brand">
-          <h1>Gran Timbó</h1>
+          <h1>Gran Parrillada Timbó</h1>
           <p className="brand-sub">Restaurante</p>
         </div>
         <p className="lead">
-          Ingresa con tu correo para gestionar pedidos, cocina e inventario.
+          Ingresa con tu correo o tu usuario para gestionar pedidos, cocina e inventario.
         </p>
 
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <label>
-          Correo
+          Correo o usuario
           <input
-            type="email"
+            type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -69,7 +69,7 @@ export function LoginPage() {
         </button>
 
         <p className="muted" style={{ fontSize: "0.82rem", margin: 0 }}>
-          Demo: admin@timbo.com / admin123 · mesero@timbo.com / mesero123 ·
+          Demo: admin o admin@timbo.com / admin123 · mesero@timbo.com / mesero123 ·
           cocinero@timbo.com / cocinero123
         </p>
       </form>

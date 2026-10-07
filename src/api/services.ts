@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import { loginBody } from "./loginBody";
 import type {
   AuthResponse,
   Dish,
@@ -51,10 +52,10 @@ export const usersApi = {
 };
 
 export const authApi = {
-  login: (email: string, password: string) =>
+  login: (identifier: string, password: string) =>
     apiRequest<AuthResponse>("/api/auth/login", {
       method: "POST",
-      body: { email, password },
+      body: loginBody(identifier, password),
     }),
   me: (token: string) =>
     apiRequest<User>("/api/auth/me", { token }),

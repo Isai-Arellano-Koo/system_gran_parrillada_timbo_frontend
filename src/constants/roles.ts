@@ -23,6 +23,12 @@ export const ROLE_OPTIONS: {
     description:
       "Operaciones de cocina: recepción de comandas y avance de la preparación hasta que el pedido está listo.",
   },
+  {
+    value: "cajero",
+    label: "Cajero",
+    description:
+      "Consulta el resumen del local. No administra usuarios, carta ni inventario.",
+  },
 ];
 
 export function roleLabel(role: UserRole) {

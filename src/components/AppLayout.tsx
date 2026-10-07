@@ -11,7 +11,7 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { to: "/", label: "Resumen", roles: ["admin", "mesero", "cocinero"] },
+  { to: "/", label: "Resumen", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", roles: ["admin", "mesero"] },
   { to: "/dishes", label: "Carta", roles: ["admin"] },
   { to: "/ingredients", label: "Ingredientes", roles: ["admin"] },
@@ -28,7 +28,7 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">Gran Timbó</div>
+          <div className="brand-mark">Gran Parrillada Timbó</div>
           <div className="brand-sub">Restaurante</div>
         </div>
 
@@ -60,7 +60,7 @@ export function AppLayout() {
 
       <div className="workspace">
         <header className="topbar">
-          <div className="topbar-title">Gran Timbó · Sede Centro</div>
+          <div className="topbar-title">Gran Parrillada Timbó · Sede Centro</div>
           <ThemeToggle />
         </header>
         <main className="main">
