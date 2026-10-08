@@ -132,14 +132,18 @@ export function UsersPage() {
                     <td>{item.username || "—"}</td>
                     <td>{roleLabel(item.role)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className={`badge ${item.is_active === false ? "badge-danger" : "badge-ok"}`}
-                        disabled={isSelf || busy}
-                        onClick={() => toggleActive(item)}
-                      >
-                        {item.is_active === false ? "Inactivo" : "Activo"}
-                      </button>
+                      {item.email_verified === false ? (
+                        <span className="badge badge-warn">Pendiente</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`badge ${item.is_active === false ? "badge-danger" : "badge-ok"}`}
+                          disabled={isSelf || busy}
+                          onClick={() => toggleActive(item)}
+                        >
+                          {item.is_active === false ? "Inactivo" : "Activo"}
+                        </button>
+                      )}
                     </td>
                     <td>
                       <Link

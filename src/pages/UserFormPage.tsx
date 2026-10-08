@@ -17,10 +17,7 @@ export function UserFormPage() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [originalEmail, setOriginalEmail] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [sentTo, setSentTo] = useState("");
-  const [sendingCode, setSendingCode] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("mesero");
@@ -41,7 +38,7 @@ export function UserFormPage() {
         setName(account.name);
         setUsername(account.username || "");
         setEmail(account.email);
-        setOriginalEmail(account.email.trim().toLowerCase());
+        setEmailVerified(account.email_verified !== false);
         setRole(account.role);
         setActive(account.is_active !== false);
       })
@@ -57,26 +54,6 @@ export function UserFormPage() {
       cancelled = true;
     };
   }, [editing, token, id]);
-
-  const sendCode = async () => {
-    if (!token) return;
-    setError("");
-    const clean = email.trim().toLowerCase();
-    if (!clean.includes("@") || !clean.split("@")[1]?.includes(".")) {
-      setError("El correo electrónico no es válido");
-      return;
-    }
-    setSendingCode(true);
-    try {
-      await usersApi.sendEmailCode(token, clean);
-      setSentTo(clean);
-    } catch (err) {
-      setSentTo("");
-      setError(err instanceof ApiError ? err.message : "No se pudo enviar el código");
-    } finally {
-      setSendingCode(false);
-    }
-  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -97,12 +74,6 @@ export function UserFormPage() {
       setError("La contraseña debe tener al menos 8 caracteres");
       return;
     }
-    const emailChanged = cleanEmail !== originalEmail;
-    if ((!editing || emailChanged) && !/^\d{6}$/.test(verificationCode.trim())) {
-      setError("Confirma el correo con el código de 6 dígitos");
-      return;
-    }
-
     setSaving(true);
     try {
       if (editing && id) {
@@ -111,9 +82,8 @@ export function UserFormPage() {
           username: cleanUsername,
           email: cleanEmail,
           role,
-          is_active: active,
+          ...(emailVerified ? { is_active: active } : {}),
           ...(password ? { password } : {}),
-          ...(emailChanged ? { verification_code: verificationCode.trim() } : {}),
         });
         if (isSelf) {
           patchSessionUser({
@@ -133,9 +103,7 @@ export function UserFormPage() {
         username: cleanUsername,
         email: cleanEmail,
         password,
-        verification_code: verificationCode.trim(),
         role,
-        is_active: active,
       });
       navigate("/users", {
         state: { message: "Usuario registrado" },
@@ -159,7 +127,7 @@ export function UserFormPage() {
       <p className="page-lead">
         {editing
           ? "Actualiza los datos de la persona y define su acceso al panel."
-          : "Suma una persona a tu equipo y define su acceso al panel del restaurante."}
+          : "Suma una persona a tu equipo. La cuenta queda deshabilitada hasta que confirme su correo."}
       </p>
 
       {loading ? <div className="panel empty">Cargando usuario...</div> : null}
@@ -203,51 +171,16 @@ export function UserFormPage() {
                 <span>
                   Correo electrónico <em>*</em>
                 </span>
-                <div className="email-confirm">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setSentTo("");
-                      setVerificationCode("");
-                    }}
-                    placeholder="Ej. juan@timbo.com"
-                    required
-                    autoComplete="off"
-                  />
-                  {!editing || email.trim().toLowerCase() !== originalEmail ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      disabled={sendingCode}
-                      onClick={sendCode}
-                    >
-                      {sendingCode ? "Enviando..." : "Enviar código"}
-                    </button>
-                  ) : null}
-                </div>
-                <small>
-                  {sentTo
-                    ? `Revisa ${sentTo}. El código caduca en 15 minutos.`
-                    : "Enviaremos un código para confirmar que el correo existe."}
-                </small>
-                {sentTo && sentTo === email.trim().toLowerCase() ? (
-                  <span className="field">
-                    <span>
-                      Código de confirmación <em>*</em>
-                    </span>
-                    <input
-                      value={verificationCode}
-                      onChange={(e) =>
-                        setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                      }
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      placeholder="6 dígitos"
-                      required
-                    />
-                  </span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Ej. juan@timbo.com"
+                  required
+                  autoComplete="off"
+                />
+                {!editing ? (
+                  <small>Puede ser cualquier correo. La persona lo confirma en su primer ingreso.</small>
                 ) : null}
               </label>
             </div>
@@ -312,22 +245,35 @@ export function UserFormPage() {
               </label>
             </div>
 
-            <div className="status-row">
-              <div>
-                <strong>Estado</strong>
-                <p>Activo: puede iniciar sesión. Inactivo: acceso suspendido.</p>
+            {!editing || !emailVerified ? (
+              <div className="status-row">
+                <div>
+                  <strong>Estado</strong>
+                  <p>
+                    Pendiente: la cuenta se activa cuando la persona confirma su correo en el
+                    primer ingreso.
+                  </p>
+                </div>
+                <span className="badge badge-warn">Pendiente</span>
               </div>
-              <label className={`switch${active ? " on" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={active}
-                  disabled={isSelf}
-                  onChange={(e) => setActive(e.target.checked)}
-                />
-                <span className="switch-ui" />
-                <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
-              </label>
-            </div>
+            ) : (
+              <div className="status-row">
+                <div>
+                  <strong>Estado</strong>
+                  <p>Activo: puede iniciar sesión. Inactivo: acceso suspendido.</p>
+                </div>
+                <label className={`switch${active ? " on" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    disabled={isSelf}
+                    onChange={(e) => setActive(e.target.checked)}
+                  />
+                  <span className="switch-ui" />
+                  <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
+                </label>
+              </div>
+            )}
 
             <div className="form-footer">
               <Link className="btn btn-ghost" to="/users">

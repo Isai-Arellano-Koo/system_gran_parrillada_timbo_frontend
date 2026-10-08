@@ -7,12 +7,22 @@ export type User = {
   email: string;
   role: UserRole;
   is_active?: boolean;
+  email_verified?: boolean;
 };
 
 export type AuthResponse = {
   accessToken: string;
   user: User;
 };
+
+export type PendingEmailConfirmation = {
+  needsEmailConfirmation: true;
+  confirmationToken: string;
+  email: string;
+  message: string;
+};
+
+export type LoginResponse = AuthResponse | PendingEmailConfirmation;
 
 export type Ingredient = {
   id: number;

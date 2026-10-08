@@ -7,12 +7,16 @@ import {
   type ReactNode,
 } from "react";
 import { authApi } from "../api/services";
-import type { User } from "../types";
+import type { PendingEmailConfirmation, User } from "../types";
 
 type AuthContextValue = {
   user: User | null;
   token: string | null;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (
+    identifier: string,
+    password: string
+  ) => Promise<PendingEmailConfirmation | void>;
+  confirmEmail: (confirmationToken: string, code: string) => Promise<void>;
   logout: () => void;
   patchSessionUser: (next: Partial<User>) => void;
 };
@@ -40,14 +44,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(stored?.token ?? null);
   const [user, setUser] = useState<User | null>(stored?.user ?? null);
 
-  const login = useCallback(async (identifier: string, password: string) => {
-    const result = await authApi.login(identifier, password);
+  const storeSession = (accessToken: string, nextUser: User) => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ token: result.accessToken, user: result.user })
+      JSON.stringify({ token: accessToken, user: nextUser })
     );
-    setToken(result.accessToken);
-    setUser(result.user);
+    setToken(accessToken);
+    setUser(nextUser);
+  };
+
+  const login = useCallback(async (identifier: string, password: string) => {
+    const result = await authApi.login(identifier, password);
+    if ("needsEmailConfirmation" in result) {
+      return result;
+    }
+    storeSession(result.accessToken, result.user);
+  }, []);
+
+  const confirmEmail = useCallback(async (confirmationToken: string, code: string) => {
+    const result = await authApi.confirmEmail(confirmationToken, code);
+    storeSession(result.accessToken, result.user);
   }, []);
 
   const logout = useCallback(() => {
@@ -73,8 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, login, logout, patchSessionUser }),
-    [user, token, login, logout, patchSessionUser]
+    () => ({ user, token, login, confirmEmail, logout, patchSessionUser }),
+    [user, token, login, confirmEmail, logout, patchSessionUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

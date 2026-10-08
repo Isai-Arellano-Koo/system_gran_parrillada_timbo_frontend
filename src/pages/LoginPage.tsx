@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
+import { authApi } from "../api/services";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
 
 const REMEMBER_KEY = "timbo_login_id";
 
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, confirmEmail } = useAuth();
   const remembered = localStorage.getItem(REMEMBER_KEY) ?? "";
   const [identifier, setIdentifier] = useState(remembered);
   const [password, setPassword] = useState("");
@@ -15,6 +16,10 @@ export function LoginPage() {
   const [forgotNote, setForgotNote] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirmationToken, setConfirmationToken] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [info, setInfo] = useState("");
 
   if (user) return <Navigate to="/" replace />;
 
@@ -27,13 +32,85 @@ export function LoginPage() {
       const value = identifier.trim();
       if (remember) localStorage.setItem(REMEMBER_KEY, value);
       else localStorage.removeItem(REMEMBER_KEY);
-      await login(value, password);
+      const pending = await login(value, password);
+      if (pending) {
+        setConfirmationToken(pending.confirmationToken);
+        setPendingEmail(pending.email);
+        setInfo(pending.message);
+        setCode("");
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesión");
     } finally {
       setLoading(false);
     }
   };
+
+  const onConfirm = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await confirmEmail(confirmationToken, code.trim());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo confirmar el correo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onResend = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await authApi.resendConfirmEmail(confirmationToken);
+      setInfo(result.message);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo reenviar el código");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (confirmationToken) {
+    return (
+      <div className="login-page">
+        <form className="login-card" onSubmit={onConfirm}>
+          <div className="login-brand">
+            <img src="/LOGO_TIMBO.png" alt="Gran Parrillada Timbó" />
+            <p>Confirma tu correo para activar la cuenta</p>
+          </div>
+
+          {error ? <div className="alert alert-error">{error}</div> : null}
+          {info ? <p className="forgot-note">{info}</p> : null}
+
+          <label className="login-field">
+            <span>Código enviado a {pendingEmail}</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="6 dígitos"
+              required
+            />
+          </label>
+
+          <button className="btn btn-primary login-submit" type="submit" disabled={loading}>
+            {loading ? "Confirmando..." : "Confirmar correo"}
+          </button>
+          <button
+            className="btn btn-ghost login-submit"
+            type="button"
+            disabled={loading}
+            onClick={onResend}
+          >
+            Reenviar código
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="login-page">

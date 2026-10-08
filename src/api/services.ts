@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import { loginBody } from "./loginBody";
 import type {
+  LoginResponse,
   AuthResponse,
   Dish,
   Ingredient,
@@ -16,12 +17,6 @@ export const usersApi = {
   list: (token: string) => apiRequest<User[]>("/api/users", { token }),
   get: (token: string, id: number) =>
     apiRequest<User>(`/api/users/${id}`, { token }),
-  sendEmailCode: (token: string, email: string) =>
-    apiRequest<{ message: string }>("/api/users/email-code", {
-      method: "POST",
-      token,
-      body: { email },
-    }),
   create: (
     token: string,
     body: {
@@ -30,8 +25,6 @@ export const usersApi = {
       email: string;
       password: string;
       role: User["role"];
-      is_active: boolean;
-      verification_code: string;
     }
   ) =>
     apiRequest<User>("/api/users", {
@@ -49,7 +42,6 @@ export const usersApi = {
       password: string;
       role: User["role"];
       is_active: boolean;
-      verification_code: string;
     }>
   ) =>
     apiRequest<User>(`/api/users/${id}`, {
@@ -61,9 +53,19 @@ export const usersApi = {
 
 export const authApi = {
   login: (identifier: string, password: string) =>
-    apiRequest<AuthResponse>("/api/auth/login", {
+    apiRequest<LoginResponse>("/api/auth/login", {
       method: "POST",
       body: loginBody(identifier, password),
+    }),
+  confirmEmail: (confirmationToken: string, code: string) =>
+    apiRequest<AuthResponse>("/api/auth/confirm-email", {
+      method: "POST",
+      body: { confirmationToken, code },
+    }),
+  resendConfirmEmail: (confirmationToken: string) =>
+    apiRequest<{ message: string }>("/api/auth/confirm-email/resend", {
+      method: "POST",
+      body: { confirmationToken },
     }),
   me: (token: string) =>
     apiRequest<User>("/api/auth/me", { token }),
