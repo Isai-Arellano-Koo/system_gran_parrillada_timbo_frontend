@@ -8,26 +8,22 @@ export const ROLE_OPTIONS: {
   {
     value: "admin",
     label: "Administrador",
-    description:
-      "Control total del sistema: gestión de usuarios, configuración general, inventario y supervisión del salón y la cocina.",
+    description: "Control total del sistema.",
   },
   {
     value: "mesero",
     label: "Mesero",
-    description:
-      "Atención directa: toma de pedidos, visualización de la carta y estado de las mesas.",
+    description: "Atención directa y pedidos.",
   },
   {
     value: "cocinero",
     label: "Cocinero",
-    description:
-      "Operaciones de cocina: recepción de comandas y avance de la preparación hasta que el pedido está listo.",
+    description: "Comandas y preparación en cocina.",
   },
   {
     value: "cajero",
     label: "Cajero",
-    description:
-      "Consulta el resumen del local. No administra usuarios, carta ni inventario.",
+    description: "Consulta el resumen del local.",
   },
 ];
 

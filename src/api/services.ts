@@ -16,6 +16,12 @@ export const usersApi = {
   list: (token: string) => apiRequest<User[]>("/api/users", { token }),
   get: (token: string, id: number) =>
     apiRequest<User>(`/api/users/${id}`, { token }),
+  sendEmailCode: (token: string, email: string) =>
+    apiRequest<{ message: string }>("/api/users/email-code", {
+      method: "POST",
+      token,
+      body: { email },
+    }),
   create: (
     token: string,
     body: {
@@ -25,6 +31,7 @@ export const usersApi = {
       password: string;
       role: User["role"];
       is_active: boolean;
+      verification_code: string;
     }
   ) =>
     apiRequest<User>("/api/users", {
@@ -42,6 +49,7 @@ export const usersApi = {
       password: string;
       role: User["role"];
       is_active: boolean;
+      verification_code: string;
     }>
   ) =>
     apiRequest<User>(`/api/users/${id}`, {

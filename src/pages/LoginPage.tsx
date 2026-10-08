@@ -2,12 +2,17 @@ import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
-import { ThemeToggle } from "../components/ThemeToggle";
+
+const REMEMBER_KEY = "timbo_login_id";
 
 export function LoginPage() {
   const { user, login } = useAuth();
-  const [email, setEmail] = useState("admin@timbo.com");
-  const [password, setPassword] = useState("admin123");
+  const remembered = localStorage.getItem(REMEMBER_KEY) ?? "";
+  const [identifier, setIdentifier] = useState(remembered);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(Boolean(remembered));
+  const [forgotNote, setForgotNote] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,9 +21,13 @@ export function LoginPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+    setForgotNote(false);
     setLoading(true);
     try {
-      await login(email, password);
+      const value = identifier.trim();
+      if (remember) localStorage.setItem(REMEMBER_KEY, value);
+      else localStorage.removeItem(REMEMBER_KEY);
+      await login(value, password);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesión");
     } finally {
@@ -28,50 +37,86 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-theme">
-        <ThemeToggle />
-      </div>
-      <form className="login-card stack" onSubmit={onSubmit}>
+      <form className="login-card" onSubmit={onSubmit}>
         <div className="login-brand">
-          <h1>Gran Parrillada Timbó</h1>
-          <p className="brand-sub">Restaurante</p>
+          <img src="/LOGO_TIMBO.png" alt="Gran Parrillada Timbó" />
+          <p>Inicia sesión con tu cuenta de colaborador</p>
         </div>
-        <p className="lead">
-          Ingresa con tu correo o tu usuario para gestionar pedidos, cocina e inventario.
-        </p>
 
         {error ? <div className="alert alert-error">{error}</div> : null}
 
-        <label>
-          Correo o usuario
+        <label className="login-field">
+          <span>Nombre de usuario o correo</span>
           <input
             type="text"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="p. ej. denis.rodriguez"
             required
             autoComplete="username"
           />
         </label>
 
-        <label>
-          Contraseña
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-          />
+        <label className="login-field">
+          <span>Contraseña</span>
+          <div className="password-field">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 3l18 18" />
+                  <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                  <path d="M9.9 5.1A9.8 9.8 0 0 1 12 5c5 0 9.3 3.1 11 7-.6 1.4-1.6 2.7-2.8 3.8M6.1 6.1C4.2 7.3 2.7 9 1 12c1.7 3.9 6 7 11 7 1.6 0 3.1-.3 4.5-.9" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
         </label>
 
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Ingresando..." : "Iniciar sesión"}
-        </button>
+        <div className="login-options">
+          <label className="remember">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            Recordar cuenta
+          </label>
+          <button
+            type="button"
+            className="forgot-link"
+            onClick={() => setForgotNote(true)}
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
 
-        <p className="muted" style={{ fontSize: "0.82rem", margin: 0 }}>
-          Demo: admin o admin@timbo.com / admin123 · mesero@timbo.com / mesero123 ·
-          cocinero@timbo.com / cocinero123
-        </p>
+        {forgotNote ? (
+          <p className="forgot-note">
+            Pide a un administrador que restablezca tu contraseña.
+          </p>
+        ) : null}
+
+        <button className="btn btn-primary login-submit" type="submit" disabled={loading}>
+          {loading ? "Ingresando..." : "Iniciar Sesión"}
+        </button>
       </form>
     </div>
   );

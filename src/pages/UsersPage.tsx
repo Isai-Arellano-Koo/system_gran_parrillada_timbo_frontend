@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
@@ -15,6 +15,8 @@ export function UsersPage() {
     (location.state as { message?: string } | null)?.message || ""
   );
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
 
   const load = async () => {
     if (!token) return;
@@ -26,22 +28,6 @@ export function UsersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar usuarios")
     );
   }, [token]);
-
-  const changeRole = async (item: User, role: UserRole) => {
-    if (!token || role === item.role) return;
-    setError("");
-    setOk("");
-    setSavingId(item.id);
-    try {
-      await usersApi.update(token, item.id, { role });
-      setOk(`Rol de ${item.name} actualizado a ${roleLabel(role)}`);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el rol");
-    } finally {
-      setSavingId(null);
-    }
-  };
 
   const toggleActive = async (item: User) => {
     if (!token) return;
@@ -64,37 +50,77 @@ export function UsersPage() {
     }
   };
 
+  const visible = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesRole = !roleFilter || item.role === roleFilter;
+      const matchesText =
+        !text ||
+        item.name.toLowerCase().includes(text) ||
+        (item.username || "").toLowerCase().includes(text);
+      return matchesRole && matchesText;
+    });
+  }, [items, query, roleFilter]);
+
+  const inactive = items.filter((item) => item.is_active === false).length;
+
   return (
     <div>
       <div className="page-head">
         <div>
           <p className="crumb">Administración › Usuarios</p>
           <h1>Usuarios</h1>
-          <p>Personas con acceso al panel. Puedes cambiar el rol de los demás.</p>
+          <p>Gestiona los accesos de tu equipo.</p>
         </div>
         <Link className="btn btn-primary" to="/users/nuevo">
-          Nuevo usuario
+          + Añadir Nuevo Usuario
         </Link>
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {ok ? <div className="alert alert-ok">{ok}</div> : null}
 
+      <div className="user-tools">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar por nombre o usuario..."
+          aria-label="Buscar usuarios"
+        />
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as UserRole | "")}
+          aria-label="Filtrar por rol"
+        >
+          <option value="">Todos los roles</option>
+          {ROLE_OPTIONS.map((role) => (
+            <option key={role.value} value={role.value}>
+              {role.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <section className="panel">
+        <div className="list-head">
+          <h2>Lista de Usuarios</h2>
+          <p>
+            {items.length} {items.length === 1 ? "usuario" : "usuarios"}
+          </p>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Nombre</th>
+                <th>Nombre completo</th>
                 <th>Usuario</th>
-                <th>Correo</th>
                 <th>Rol</th>
                 <th>Estado</th>
-                <th></th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
+              {visible.map((item) => {
                 const isSelf = item.id === user?.id;
                 const busy = savingId === item.id;
                 return (
@@ -104,24 +130,7 @@ export function UsersPage() {
                       {isSelf ? <div className="hint">Tu cuenta</div> : null}
                     </td>
                     <td>{item.username || "—"}</td>
-                    <td>{item.email}</td>
-                    <td>
-                      <select
-                        className="select-inline"
-                        value={item.role}
-                        disabled={isSelf || busy}
-                        aria-label={`Rol de ${item.name}`}
-                        onChange={(e) =>
-                          changeRole(item, e.target.value as UserRole)
-                        }
-                      >
-                        {ROLE_OPTIONS.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                    <td>{roleLabel(item.role)}</td>
                     <td>
                       <button
                         type="button"
@@ -133,8 +142,15 @@ export function UsersPage() {
                       </button>
                     </td>
                     <td>
-                      <Link className="btn btn-ghost" to={`/users/${item.id}`}>
-                        Editar
+                      <Link
+                        className="icon-link"
+                        to={`/users/${item.id}`}
+                        aria-label={`Editar a ${item.name}`}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
+                        </svg>
                       </Link>
                     </td>
                   </tr>
@@ -142,9 +158,17 @@ export function UsersPage() {
               })}
             </tbody>
           </table>
-          {items.length === 0 ? (
-            <div className="empty">Aún no hay usuarios</div>
+          {visible.length === 0 ? (
+            <div className="empty">No hay usuarios con ese filtro</div>
           ) : null}
+        </div>
+        <div className="list-foot">
+          <span>
+            Mostrando {visible.length} de {items.length} usuarios
+          </span>
+          <span>
+            {inactive === 1 ? "1 usuario inactivo" : `${inactive} usuarios inactivos`}
+          </span>
         </div>
       </section>
     </div>

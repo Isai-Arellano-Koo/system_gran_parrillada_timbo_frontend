@@ -17,6 +17,10 @@ export function UserFormPage() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [originalEmail, setOriginalEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [sentTo, setSentTo] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("mesero");
@@ -37,6 +41,7 @@ export function UserFormPage() {
         setName(account.name);
         setUsername(account.username || "");
         setEmail(account.email);
+        setOriginalEmail(account.email.trim().toLowerCase());
         setRole(account.role);
         setActive(account.is_active !== false);
       })
@@ -53,12 +58,33 @@ export function UserFormPage() {
     };
   }, [editing, token, id]);
 
+  const sendCode = async () => {
+    if (!token) return;
+    setError("");
+    const clean = email.trim().toLowerCase();
+    if (!clean.includes("@") || !clean.split("@")[1]?.includes(".")) {
+      setError("El correo electrónico no es válido");
+      return;
+    }
+    setSendingCode(true);
+    try {
+      await usersApi.sendEmailCode(token, clean);
+      setSentTo(clean);
+    } catch (err) {
+      setSentTo("");
+      setError(err instanceof ApiError ? err.message : "No se pudo enviar el código");
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setError("");
 
     const cleanUsername = username.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
     if (!USERNAME_RE.test(cleanUsername)) {
       setError("El nombre de usuario solo puede tener letras, números y puntos, sin espacios");
       return;
@@ -71,6 +97,11 @@ export function UserFormPage() {
       setError("La contraseña debe tener al menos 8 caracteres");
       return;
     }
+    const emailChanged = cleanEmail !== originalEmail;
+    if ((!editing || emailChanged) && !/^\d{6}$/.test(verificationCode.trim())) {
+      setError("Confirma el correo con el código de 6 dígitos");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -78,10 +109,11 @@ export function UserFormPage() {
         const updated = await usersApi.update(token, Number(id), {
           name: name.trim(),
           username: cleanUsername,
-          email: email.trim(),
+          email: cleanEmail,
           role,
           is_active: active,
           ...(password ? { password } : {}),
+          ...(emailChanged ? { verification_code: verificationCode.trim() } : {}),
         });
         if (isSelf) {
           patchSessionUser({
@@ -99,8 +131,9 @@ export function UserFormPage() {
       await usersApi.create(token, {
         name: name.trim(),
         username: cleanUsername,
-        email: email.trim(),
+        email: cleanEmail,
         password,
+        verification_code: verificationCode.trim(),
         role,
         is_active: active,
       });
@@ -150,92 +183,134 @@ export function UserFormPage() {
               />
             </label>
 
-            <label className="field">
-              <span>
-                Nombre de usuario <em>*</em>
-              </span>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                placeholder="Ej. daniel.rodriguez"
-                required
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <small>Sin espacios. Solo letras, números y puntos.</small>
-            </label>
-
-            <label className="field">
-              <span>
-                Correo electrónico <em>*</em>
-              </span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ej. daniel.rodriguez@timbo.com"
-                required
-                autoComplete="off"
-              />
-            </label>
-
-            <label className="field">
-              <span>
-                Contraseña {editing ? null : <em>*</em>}
-              </span>
-              <div className="password-field">
+            <div className="form-row">
+              <label className="field">
+                <span>
+                  Nombre de usuario <em>*</em>
+                </span>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={editing ? "Dejar en blanco para no cambiarla" : ""}
-                  required={!editing}
-                  minLength={editing ? undefined : 8}
-                  autoComplete="new-password"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                  placeholder="Ej. juan.perez"
+                  required
+                  autoComplete="off"
+                  spellCheck={false}
                 />
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showPassword ? (
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                      <path d="M9.9 5.1A9.8 9.8 0 0 1 12 5c5 0 9.3 3.1 11 7-.6 1.4-1.6 2.7-2.8 3.8M6.1 6.1C4.2 7.3 2.7 9 1 12c1.7 3.9 6 7 11 7 1.6 0 3.1-.3 4.5-.9" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              <small>Usa al menos 8 caracteres.</small>
-            </label>
+                <small>Se utilizará para iniciar sesión.</small>
+              </label>
 
-            <label className="field">
-              <span>
-                Rol <em>*</em>
-              </span>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                disabled={isSelf}
-                required
-              >
-                {ROLE_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              {isSelf ? (
-                <small>No puedes cambiar tu propio rol desde esta cuenta.</small>
-              ) : null}
-            </label>
+              <label className="field">
+                <span>
+                  Correo electrónico <em>*</em>
+                </span>
+                <div className="email-confirm">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setSentTo("");
+                      setVerificationCode("");
+                    }}
+                    placeholder="Ej. juan@timbo.com"
+                    required
+                    autoComplete="off"
+                  />
+                  {!editing || email.trim().toLowerCase() !== originalEmail ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={sendingCode}
+                      onClick={sendCode}
+                    >
+                      {sendingCode ? "Enviando..." : "Enviar código"}
+                    </button>
+                  ) : null}
+                </div>
+                <small>
+                  {sentTo
+                    ? `Revisa ${sentTo}. El código caduca en 15 minutos.`
+                    : "Enviaremos un código para confirmar que el correo existe."}
+                </small>
+                {sentTo && sentTo === email.trim().toLowerCase() ? (
+                  <span className="field">
+                    <span>
+                      Código de confirmación <em>*</em>
+                    </span>
+                    <input
+                      value={verificationCode}
+                      onChange={(e) =>
+                        setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="6 dígitos"
+                      required
+                    />
+                  </span>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="form-row">
+              <label className="field">
+                <span>
+                  Contraseña {editing ? null : <em>*</em>}
+                </span>
+                <div className="password-field">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={editing ? "Dejar en blanco para no cambiarla" : "Ingresa una contraseña"}
+                    required={!editing}
+                    minLength={editing ? undefined : 8}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? (
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                        <path d="M9.9 5.1A9.8 9.8 0 0 1 12 5c5 0 9.3 3.1 11 7-.6 1.4-1.6 2.7-2.8 3.8M6.1 6.1C4.2 7.3 2.7 9 1 12c1.7 3.9 6 7 11 7 1.6 0 3.1-.3 4.5-.9" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <small>Usa al menos 8 caracteres.</small>
+              </label>
+
+              <label className="field">
+                <span>
+                  Rol <em>*</em>
+                </span>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  disabled={isSelf}
+                  required
+                >
+                  {ROLE_OPTIONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                {isSelf ? (
+                  <small>No puedes cambiar tu propio rol desde esta cuenta.</small>
+                ) : null}
+              </label>
+            </div>
 
             <div className="status-row">
               <div>
@@ -275,11 +350,24 @@ export function UserFormPage() {
               información y ordenar el flujo de trabajo de tu equipo.
             </p>
             {ROLE_OPTIONS.map((item) => (
-              <article className="role-item" key={item.value}>
-                <strong>{item.label}</strong>
-                <p>{item.description}</p>
-              </article>
+              <button
+                type="button"
+                key={item.value}
+                className={`role-card${role === item.value ? " on" : ""}`}
+                disabled={isSelf}
+                onClick={() => setRole(item.value)}
+              >
+                <span className="role-mark">{item.label.slice(0, 1)}</span>
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.description}</small>
+                </span>
+                {role === item.value ? <span className="role-check">✓</span> : <span />}
+              </button>
             ))}
+            <p className="hint">
+              Puedes cambiar el rol y el estado del usuario cuando lo necesites.
+            </p>
           </aside>
         </div>
       ) : null}
