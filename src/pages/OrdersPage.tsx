@@ -94,6 +94,7 @@ export function OrdersPage() {
     }
   };
 
+  // Revisa ingredientes sin confirmar todavía
   const validateStock = async () => {
     if (!token || !activeOrder) return;
     setError("");
@@ -117,6 +118,7 @@ export function OrdersPage() {
     }
   };
 
+  // Confirmar manda a cocina y baja el stock
   const confirmOrder = async () => {
     if (!token || !activeOrder) return;
     setError("");

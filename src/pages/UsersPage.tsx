@@ -35,7 +35,7 @@ export function UsersPage() {
     setOk("");
     setSavingId(item.id);
     try {
-      const is_active = item.is_active === false;
+      const is_active = item.is_active === false; // si está apagada, la encendemos, y al revés
       await usersApi.update(token, item.id, { is_active });
       setOk(
         is_active

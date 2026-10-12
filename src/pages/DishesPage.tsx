@@ -104,7 +104,7 @@ export function DishesPage() {
           description: description.trim(),
           is_active: active,
         });
-        await catalogApi.setRecipe(token, editingId, items);
+        await catalogApi.setRecipe(token, editingId, items); // la receta se guarda aparte del plato
         setOk("Plato y receta actualizados");
       } else {
         const created = await catalogApi.createDish(token, {

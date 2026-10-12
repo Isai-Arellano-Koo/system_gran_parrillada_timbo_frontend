@@ -26,7 +26,7 @@ function readTheme(): ThemeMode {
 }
 
 function applyTheme(theme: ThemeMode) {
-  document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.theme = theme; // el CSS lee esto para modo claro/oscuro
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

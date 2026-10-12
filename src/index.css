@@ -864,6 +864,34 @@ button.badge:disabled {
   gap: 0.95rem;
 }
 
+.login-card,
+.login-card .login-field,
+.login-card .login-brand p,
+.login-card .forgot-note,
+.login-card .remember {
+  color: #1c1917;
+}
+
+.login-card .login-brand p,
+.login-card .forgot-note {
+  color: #57534e;
+}
+
+.login-card .remember {
+  color: #44403c;
+}
+
+.login-card .alert-error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.login-card .btn-ghost {
+  background: #fff;
+  color: #1c1917;
+  border-color: #e7e5e4;
+}
+
 .login-brand {
   display: grid;
   justify-items: center;

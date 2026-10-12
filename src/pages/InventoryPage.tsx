@@ -39,6 +39,7 @@ export function InventoryPage() {
     setError("");
     setOk("");
     try {
+      // Una entrada suma stock y deja el movimiento
       await inventoryApi.createEntry(token, {
         ingredient_id: Number(ingredientId),
         quantity: Number(quantity),

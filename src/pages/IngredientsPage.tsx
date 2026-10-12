@@ -74,6 +74,7 @@ export function IngredientsPage() {
           is_active: active,
         });
         if (!current || Number(current.stock_current) !== nextStock) {
+          // El stock no se edita a mano: pasa por un movimiento de ajuste
           await inventoryApi.adjustStock(token, {
             ingredient_id: editingId,
             stock_current: nextStock,

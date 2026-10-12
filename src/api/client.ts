@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// En local apunta al backend. En Railway se cambia con VITE_API_URL
 
 type RequestOptions = {
   method?: string;

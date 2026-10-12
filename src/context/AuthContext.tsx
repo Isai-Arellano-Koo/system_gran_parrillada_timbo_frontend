@@ -23,7 +23,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = "timbo_auth";
+const STORAGE_KEY = "timbo_auth"; // guarda token y usuario para no perder la sesión
 
 type StoredAuth = {
   token: string;
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (identifier: string, password: string) => {
     const result = await authApi.login(identifier, password);
     if ("needsEmailConfirmation" in result) {
-      return result;
+      return result; // todavía no hay sesión, falta el código del correo
     }
     storeSession(result.accessToken, result.user);
   }, []);

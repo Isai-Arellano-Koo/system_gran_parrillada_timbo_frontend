@@ -12,6 +12,7 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
+  // Cada ítem dice qué roles lo ven
   { to: "/", label: "Resumen", icon: "home", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", icon: "orders", roles: ["admin", "mesero"] },
   { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin"] },

@@ -98,6 +98,7 @@ export function UserFormPage() {
         return;
       }
 
+      // La cuenta nace deshabilitada. Se activa al confirmar el correo
       await usersApi.create(token, {
         name: name.trim(),
         username: cleanUsername,

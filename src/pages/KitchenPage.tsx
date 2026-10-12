@@ -34,7 +34,7 @@ export function KitchenPage() {
     );
     const id = window.setInterval(() => {
       load().catch(() => undefined);
-    }, 8000);
+    }, 8000); // refresca cada 8 segundos para ver comandas nuevas
     return () => window.clearInterval(id);
   }, [token]);
 
@@ -55,7 +55,7 @@ export function KitchenPage() {
     }
   };
 
-  const canUpdate = user?.role === "cocinero" || user?.role === "admin";
+  const canUpdate = user?.role === "cocinero" || user?.role === "admin"; // el mesero solo mira
 
   return (
     <div>

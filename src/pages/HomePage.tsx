@@ -10,7 +10,7 @@ export function HomePage() {
   const [alerts, setAlerts] = useState(0);
 
   useEffect(() => {
-    if (!token || user?.role === "cajero") return;
+    if (!token || user?.role === "cajero") return; // el cajero solo ve el resumen, sin pedidos ni cocina
     const load = async () => {
       try {
         const [orderList, ticketList] = await Promise.all([

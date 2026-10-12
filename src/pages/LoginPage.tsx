@@ -34,6 +34,7 @@ export function LoginPage() {
       else localStorage.removeItem(REMEMBER_KEY);
       const pending = await login(value, password);
       if (pending) {
+        // La cuenta existe, pero primero hay que confirmar el correo
         setConfirmationToken(pending.confirmationToken);
         setPendingEmail(pending.email);
         setInfo(pending.message);

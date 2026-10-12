@@ -13,6 +13,7 @@ import type {
   User,
 } from "../types";
 
+// Llamadas al backend agrupadas por módulo
 export const usersApi = {
   list: (token: string) => apiRequest<User[]>("/api/users", { token }),
   get: (token: string, id: number) =>
