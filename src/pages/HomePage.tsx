@@ -7,30 +7,11 @@ function firstName(name: string) {
   return name.trim().split(" ")[0] || name;
 }
 
-function greeting(role: string | undefined, name: string) {
-  const who = firstName(name);
-  if (role === "mesero") {
-    return {
-      title: `Hola, ${who}`,
-      lead: "Cuando una mesa pida, abre el pedido acá y mándalo a la parrilla.",
-    };
-  }
-  if (role === "cocinero") {
-    return {
-      title: `Hola, ${who}`,
-      lead: "Las comandas que llegan del salón aparecen en Cocina.",
-    };
-  }
-  if (role === "cajero") {
-    return {
-      title: `Hola, ${who}`,
-      lead: "Desde acá no se toman pedidos. Mesero y cocina atienden el salón.",
-    };
-  }
-  return {
-    title: `Hola, ${who}`,
-    lead: "Pedidos abiertos, lo que está en la parrilla y si falta algún ingrediente.",
-  };
+function leadFor(role: string | undefined) {
+  if (role === "mesero") return "Abrí el pedido de la mesa y mandalo a cocina.";
+  if (role === "cocinero") return "Las comandas del salón salen acá, en orden.";
+  if (role === "cajero") return "Pedidos y cocina los atienden mesero y parrilla.";
+  return "Lo que hay abierto en el salón y en la parrilla.";
 }
 
 export function HomePage() {
@@ -38,8 +19,7 @@ export function HomePage() {
   const [orders, setOrders] = useState(0);
   const [tickets, setTickets] = useState(0);
   const [alerts, setAlerts] = useState(0);
-  const copy = greeting(user?.role, user?.name || "");
-  const showNumbers = user?.role !== "cajero";
+  const showFloor = user?.role !== "cajero";
 
   useEffect(() => {
     if (!token || user?.role === "cajero") return;
@@ -62,68 +42,73 @@ export function HomePage() {
     load();
   }, [token, user]);
 
+  const primary =
+    user?.role === "mesero" || user?.role === "admin" ? (
+      <Link className="btn btn-primary" to="/orders">
+        Tomar un pedido
+      </Link>
+    ) : user?.role === "cocinero" ? (
+      <Link className="btn btn-primary" to="/kitchen">
+        Ir a cocina
+      </Link>
+    ) : null;
+
   return (
     <div>
       <div className="page-head">
         <div>
-          <h1>{copy.title}</h1>
-          <p>{copy.lead}</p>
+          <h1>Hola, {firstName(user?.name || "")}</h1>
+          <p>{leadFor(user?.role)}</p>
         </div>
+        {primary}
       </div>
 
-      {showNumbers ? (
-        <div className={user?.role === "admin" ? "grid-3" : "grid-2"}>
-          <div className="stat">
-            <span>Mesas con pedido</span>
-            <strong>{orders}</strong>
+      {showFloor ? (
+        <section className="panel">
+          <div className="list-head">
+            <h2>En el local ahora</h2>
           </div>
-          <div className="stat">
-            <span>En la parrilla</span>
-            <strong>{tickets}</strong>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Qué</th>
+                  <th>Cantidad</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Mesas con pedido</td>
+                  <td>{orders}</td>
+                  <td>
+                    {user?.role === "mesero" || user?.role === "admin" ? (
+                      <Link to="/orders">Ver pedidos</Link>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Comandas en la parrilla</td>
+                  <td>{tickets}</td>
+                  <td>
+                    <Link to="/kitchen">Ver cocina</Link>
+                  </td>
+                </tr>
+                {user?.role === "admin" ? (
+                  <tr>
+                    <td>Ingredientes por reponer</td>
+                    <td>{alerts}</td>
+                    <td>
+                      <Link to="/inventory">Ver despensa</Link>
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
-          {user?.role === "admin" ? (
-            <div className="stat">
-              <span>Ingredientes por reponer</span>
-              <strong>{alerts}</strong>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {user?.role !== "cajero" ? (
-        <div className="panel" style={{ marginTop: "1rem" }}>
-          <h2>Qué puedes hacer</h2>
-          <div className="actions">
-            {(user?.role === "mesero" || user?.role === "admin") && (
-              <Link className="btn btn-primary" to="/orders">
-                Tomar un pedido
-              </Link>
-            )}
-            {(user?.role === "cocinero" || user?.role === "admin") && (
-              <Link className="btn btn-ghost" to="/kitchen">
-                Ver la parrilla
-              </Link>
-            )}
-            {user?.role === "mesero" && (
-              <Link className="btn btn-ghost" to="/kitchen">
-                Ver comandas
-              </Link>
-            )}
-            {user?.role === "admin" && (
-              <>
-                <Link className="btn btn-ghost" to="/dishes">
-                  Carta
-                </Link>
-                <Link className="btn btn-ghost" to="/inventory">
-                  Despensa
-                </Link>
-                <Link className="btn btn-ghost" to="/users">
-                  Equipo
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
+        </section>
       ) : null}
     </div>
   );
