@@ -89,6 +89,10 @@ export function DishesPage() {
     }
 
     const filled = recipeRows.filter((row) => row.ingredient_id || row.quantity);
+    if (filled.length === 0) {
+      setError("La receta debe tener al menos un ingrediente");
+      return;
+    }
     const incomplete = filled.some((row) => !row.ingredient_id || !row.quantity);
     if (incomplete) {
       setError("Cada línea de la receta necesita ingrediente y cantidad");
@@ -99,6 +103,10 @@ export function DishesPage() {
       ingredient_id: Number(row.ingredient_id),
       quantity: Number(row.quantity),
     }));
+    if (items.some((item) => !item.quantity || item.quantity <= 0)) {
+      setError("Cada cantidad debe ser mayor que cero");
+      return;
+    }
     const ids = items.map((item) => item.ingredient_id);
     if (new Set(ids).size !== ids.length) {
       setError("No se puede repetir un ingrediente en la misma receta");
@@ -123,10 +131,8 @@ export function DishesPage() {
           description: description.trim(),
           is_active: active,
         });
-        if (items.length) {
-          await catalogApi.setRecipe(token, created.id, items);
-        }
-        setOk("Plato registrado");
+        await catalogApi.setRecipe(token, created.id, items);
+        setOk("Plato y receta registrados");
         resetForm();
       }
       await load();
@@ -151,10 +157,18 @@ export function DishesPage() {
     }
   };
 
-  const ingredientChoices = (selectedId: string) =>
-    ingredients.filter(
-      (item) => item.is_active || String(item.id) === selectedId
+  const ingredientChoices = (selectedId: string, rowIndex: number) => {
+    const used = new Set(
+      recipeRows
+        .filter((row, i) => i !== rowIndex && row.ingredient_id)
+        .map((row) => row.ingredient_id)
     );
+    return ingredients.filter((item) => {
+      const selected = String(item.id) === selectedId;
+      if (used.has(String(item.id))) return false;
+      return item.is_active || selected;
+    });
+  };
 
   return (
     <div>
@@ -212,11 +226,18 @@ export function DishesPage() {
           <div className="status-row">
             <div>
               <strong>Receta</strong>
-              <p>Ingredientes que se descuentan del inventario al confirmar el pedido.</p>
+              <p>
+                Al menos un ingrediente, sin repetir, con cantidad en su unidad. Si
+                cambias la receta, los pedidos ya confirmados no se recalculan.
+              </p>
             </div>
           </div>
 
-          {recipeRows.map((row, index) => (
+          {recipeRows.map((row, index) => {
+            const selected = ingredients.find(
+              (item) => String(item.id) === row.ingredient_id
+            );
+            return (
             <div className="recipe-row" key={index}>
               <label>
                 Ingrediente
@@ -225,9 +246,10 @@ export function DishesPage() {
                   onChange={(e) =>
                     updateRow(index, { ingredient_id: e.target.value })
                   }
+                  required
                 >
                   <option value="">Seleccionar...</option>
-                  {ingredientChoices(row.ingredient_id).map((ing) => (
+                  {ingredientChoices(row.ingredient_id, index).map((ing) => (
                     <option key={ing.id} value={ing.id}>
                       {ing.name} ({ing.unit})
                       {ing.is_active ? "" : " · inactivo"}
@@ -236,7 +258,7 @@ export function DishesPage() {
                 </select>
               </label>
               <label>
-                Cantidad
+                Cantidad{selected ? ` (${selected.unit})` : ""}
                 <input
                   type="number"
                   min="0.001"
@@ -244,6 +266,7 @@ export function DishesPage() {
                   value={row.quantity}
                   onChange={(e) => updateRow(index, { quantity: e.target.value })}
                   placeholder="0.000"
+                  required
                 />
               </label>
               <button
@@ -258,7 +281,8 @@ export function DishesPage() {
                 Quitar
               </button>
             </div>
-          ))}
+            );
+          })}
 
           <div className="actions">
             <button
