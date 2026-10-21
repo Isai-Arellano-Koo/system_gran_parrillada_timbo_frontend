@@ -43,6 +43,7 @@ export const usersApi = {
       password: string;
       role: User["role"];
       is_active: boolean;
+      status_reason: string;
     }>
   ) =>
     apiRequest<User>(`/api/users/${id}`, {
@@ -50,6 +51,17 @@ export const usersApi = {
       token,
       body,
     }),
+  statusChanges: (token: string, id: number) =>
+    apiRequest<
+      Array<{
+        id: number;
+        previous_is_active: boolean;
+        next_is_active: boolean;
+        reason: string;
+        created_at?: string;
+        changed_by_user?: { id: number; name: string; email: string };
+      }>
+    >(`/api/users/${id}/status-changes`, { token }),
 };
 
 export const authApi = {
@@ -67,6 +79,19 @@ export const authApi = {
     apiRequest<{ message: string }>("/api/auth/confirm-email/resend", {
       method: "POST",
       body: { confirmationToken },
+    }),
+  requestPasswordReset: (identifier: string) =>
+    apiRequest<{ message: string; emailHint?: string }>(
+      "/api/auth/password-reset",
+      {
+        method: "POST",
+        body: loginBody(identifier, "-"),
+      }
+    ),
+  confirmPasswordReset: (identifier: string, code: string, password: string) =>
+    apiRequest<{ message: string }>("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: { ...loginBody(identifier, password), code },
     }),
   me: (token: string) =>
     apiRequest<User>("/api/auth/me", { token }),
@@ -87,7 +112,12 @@ export const catalogApi = {
   updateIngredient: (
     token: string,
     id: number,
-    body: Partial<Ingredient>
+    body: Partial<{
+      name: string;
+      unit: string;
+      stock_minimum: number;
+      is_active: boolean;
+    }>
   ) =>
     apiRequest<Ingredient>(`/api/catalog/ingredients/${id}`, {
       method: "PATCH",

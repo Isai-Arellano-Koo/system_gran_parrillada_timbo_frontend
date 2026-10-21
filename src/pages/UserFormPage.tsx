@@ -22,6 +22,8 @@ export function UserFormPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("mesero");
   const [active, setActive] = useState(true);
+  const [originalActive, setOriginalActive] = useState(true);
+  const [statusReason, setStatusReason] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,10 @@ export function UserFormPage() {
         setEmail(account.email);
         setEmailVerified(account.email_verified !== false);
         setRole(account.role);
-        setActive(account.is_active !== false);
+        const nextActive = account.is_active !== false;
+        setActive(nextActive);
+        setOriginalActive(nextActive);
+        setStatusReason("");
       })
       .catch((err) => {
         if (!cancelled) {
@@ -74,6 +79,10 @@ export function UserFormPage() {
       setError("La contraseña debe tener al menos 8 caracteres");
       return;
     }
+    if (editing && emailVerified && active !== originalActive && statusReason.trim().length < 3) {
+      setError("Indica el motivo del cambio de estado");
+      return;
+    }
     setSaving(true);
     try {
       if (editing && id) {
@@ -83,6 +92,9 @@ export function UserFormPage() {
           email: cleanEmail,
           role,
           ...(emailVerified ? { is_active: active } : {}),
+          ...(emailVerified && active !== originalActive
+            ? { status_reason: statusReason.trim() }
+            : {}),
           ...(password ? { password } : {}),
         });
         if (isSelf) {
@@ -275,6 +287,21 @@ export function UserFormPage() {
                 </label>
               </div>
             )}
+
+            {editing && emailVerified && active !== originalActive && !isSelf ? (
+              <label className="field">
+                <span>
+                  Motivo del cambio de estado <em>*</em>
+                </span>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  rows={3}
+                  required
+                  placeholder="Queda registrado quién lo cambió, cuándo y por qué."
+                />
+              </label>
+            ) : null}
 
             <div className="form-footer">
               <Link className="btn btn-ghost" to="/users">

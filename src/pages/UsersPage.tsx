@@ -17,6 +17,8 @@ export function UsersPage() {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
+  const [statusTarget, setStatusTarget] = useState<User | null>(null);
+  const [statusReason, setStatusReason] = useState("");
 
   const load = async () => {
     if (!token) return;
@@ -29,19 +31,34 @@ export function UsersPage() {
     );
   }, [token]);
 
-  const toggleActive = async (item: User) => {
-    if (!token) return;
+  const openStatusDialog = (item: User) => {
     setError("");
     setOk("");
-    setSavingId(item.id);
+    setStatusTarget(item);
+    setStatusReason("");
+  };
+
+  const confirmStatusChange = async () => {
+    if (!token || !statusTarget) return;
+    const reason = statusReason.trim();
+    if (reason.length < 3) {
+      setError("Indica el motivo del cambio de estado");
+      return;
+    }
+    setSavingId(statusTarget.id);
     try {
-      const is_active = item.is_active === false; // si está apagada, la encendemos, y al revés
-      await usersApi.update(token, item.id, { is_active });
+      const is_active = statusTarget.is_active === false;
+      await usersApi.update(token, statusTarget.id, {
+        is_active,
+        status_reason: reason,
+      });
       setOk(
         is_active
-          ? `${item.name} puede iniciar sesión de nuevo`
-          : `Acceso de ${item.name} suspendido`
+          ? `${statusTarget.name} puede iniciar sesión de nuevo`
+          : `Acceso de ${statusTarget.name} suspendido`
       );
+      setStatusTarget(null);
+      setStatusReason("");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar el estado");
@@ -139,7 +156,7 @@ export function UsersPage() {
                           type="button"
                           className={`badge ${item.is_active === false ? "badge-danger" : "badge-ok"}`}
                           disabled={isSelf || busy}
-                          onClick={() => toggleActive(item)}
+                          onClick={() => openStatusDialog(item)}
                         >
                           {item.is_active === false ? "Inactivo" : "Activo"}
                         </button>
@@ -175,6 +192,54 @@ export function UsersPage() {
           </span>
         </div>
       </section>
+
+      {statusTarget ? (
+        <div className="dialog-backdrop" role="presentation" onClick={() => setStatusTarget(null)}>
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-labelledby="status-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="status-dialog-title">
+              {statusTarget.is_active === false
+                ? `Reactivar a ${statusTarget.name}`
+                : `Suspender a ${statusTarget.name}`}
+            </h2>
+            <p className="page-lead">
+              El motivo queda guardado con la fecha y quién hizo el cambio.
+            </p>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <label className="field">
+              <span>Motivo</span>
+              <textarea
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+                rows={3}
+                required
+                placeholder="Ej. Fin de contrato, error de acceso, reincorporación..."
+              />
+            </label>
+            <div className="form-footer">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setStatusTarget(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={savingId === statusTarget.id}
+                onClick={confirmStatusChange}
+              >
+                {savingId === statusTarget.id ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

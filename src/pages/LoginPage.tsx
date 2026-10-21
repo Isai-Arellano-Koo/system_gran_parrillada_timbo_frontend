@@ -6,6 +6,8 @@ import { ApiError } from "../api/client";
 
 const REMEMBER_KEY = "timbo_login_id";
 
+type Screen = "login" | "confirm" | "locked" | "reset";
+
 export function LoginPage() {
   const { user, login, confirmEmail } = useAuth();
   const remembered = localStorage.getItem(REMEMBER_KEY) ?? "";
@@ -13,20 +15,21 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(Boolean(remembered));
-  const [forgotNote, setForgotNote] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [screen, setScreen] = useState<Screen>("login");
   const [confirmationToken, setConfirmationToken] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
   const [code, setCode] = useState("");
   const [info, setInfo] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [resetSent, setResetSent] = useState(false);
 
   if (user) return <Navigate to="/" replace />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    setForgotNote(false);
     setLoading(true);
     try {
       const value = identifier.trim();
@@ -34,13 +37,18 @@ export function LoginPage() {
       else localStorage.removeItem(REMEMBER_KEY);
       const pending = await login(value, password);
       if (pending) {
-        // La cuenta existe, pero primero hay que confirmar el correo
         setConfirmationToken(pending.confirmationToken);
         setPendingEmail(pending.email);
         setInfo(pending.message);
         setCode("");
+        setScreen("confirm");
       }
     } catch (err) {
+      if (err instanceof ApiError && err.payload.locked) {
+        setError(err.message);
+        setScreen("locked");
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesión");
     } finally {
       setLoading(false);
@@ -73,7 +81,67 @@ export function LoginPage() {
     }
   };
 
-  if (confirmationToken) {
+  const sendResetCode = async () => {
+    const value = identifier.trim();
+    if (!value) {
+      setError("Indica el usuario o el correo de la cuenta");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      const result = await authApi.requestPasswordReset(value);
+      setInfo(result.message);
+      setResetSent(true);
+      setScreen("reset");
+      setCode("");
+      setNewPassword("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo enviar el código");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onReset = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const result = await authApi.confirmPasswordReset(
+        identifier.trim(),
+        code.trim(),
+        newPassword
+      );
+      setInfo(result.message);
+      setPassword("");
+      setCode("");
+      setNewPassword("");
+      setResetSent(false);
+      setScreen("login");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo cambiar la contraseña");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const otherAccount = () => {
+    setScreen("login");
+    setIdentifier("");
+    setPassword("");
+    setError("");
+    setInfo("");
+    setLockedClear();
+  };
+
+  const setLockedClear = () => {
+    setResetSent(false);
+    setCode("");
+    setNewPassword("");
+  };
+
+  if (screen === "confirm") {
     return (
       <div className="login-page">
         <form className="login-card" onSubmit={onConfirm}>
@@ -113,6 +181,112 @@ export function LoginPage() {
     );
   }
 
+  if (screen === "locked") {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-brand">
+            <img src="/LOGO_TIMBO.png" alt="Gran Parrillada Timbó" />
+            <p>Esta cuenta quedó bloqueada un rato</p>
+          </div>
+          {error ? <div className="alert alert-error">{error}</div> : null}
+          <p className="forgot-note">
+            Después de 5 intentos fallidos hay que esperar 15 minutos, o restablecer la
+            contraseña con el código que llega al correo.
+          </p>
+          <button
+            className="btn btn-primary login-submit"
+            type="button"
+            disabled={loading}
+            onClick={sendResetCode}
+          >
+            Restablecer contraseña
+          </button>
+          <button
+            className="btn btn-ghost login-submit"
+            type="button"
+            onClick={otherAccount}
+          >
+            Entrar con otra cuenta
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "reset") {
+    return (
+      <div className="login-page">
+        <form className="login-card" onSubmit={onReset}>
+          <div className="login-brand">
+            <img src="/LOGO_TIMBO.png" alt="Gran Parrillada Timbó" />
+            <p>Restablecer contraseña</p>
+          </div>
+          {error ? <div className="alert alert-error">{error}</div> : null}
+          {info ? <p className="forgot-note">{info}</p> : null}
+
+          {!resetSent ? (
+            <>
+              <label className="login-field">
+                <span>Nombre de usuario o correo</span>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                  autoComplete="username"
+                />
+              </label>
+              <button
+                className="btn btn-primary login-submit"
+                type="button"
+                disabled={loading}
+                onClick={sendResetCode}
+              >
+                {loading ? "Enviando..." : "Enviar código"}
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="login-field">
+                <span>Código de 6 dígitos</span>
+                <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6 dígitos"
+                  required
+                />
+              </label>
+              <label className="login-field">
+                <span>Nueva contraseña</span>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                />
+              </label>
+              <button className="btn btn-primary login-submit" type="submit" disabled={loading}>
+                {loading ? "Guardando..." : "Cambiar contraseña"}
+              </button>
+            </>
+          )}
+          <button
+            className="btn btn-ghost login-submit"
+            type="button"
+            onClick={otherAccount}
+          >
+            Volver al inicio de sesión
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={onSubmit}>
@@ -122,6 +296,7 @@ export function LoginPage() {
         </div>
 
         {error ? <div className="alert alert-error">{error}</div> : null}
+        {info ? <p className="forgot-note">{info}</p> : null}
 
         <label className="login-field">
           <span>Nombre de usuario o correo</span>
@@ -180,17 +355,16 @@ export function LoginPage() {
           <button
             type="button"
             className="forgot-link"
-            onClick={() => setForgotNote(true)}
+            onClick={() => {
+              setError("");
+              setInfo("");
+              setResetSent(false);
+              setScreen("reset");
+            }}
           >
             ¿Olvidaste tu contraseña?
           </button>
         </div>
-
-        {forgotNote ? (
-          <p className="forgot-note">
-            Pide a un administrador que restablezca tu contraseña.
-          </p>
-        ) : null}
 
         <button className="btn btn-primary login-submit" type="submit" disabled={loading}>
           {loading ? "Ingresando..." : "Iniciar Sesión"}

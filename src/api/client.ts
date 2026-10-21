@@ -9,10 +9,16 @@ type RequestOptions = {
 
 export class ApiError extends Error {
   status: number;
+  payload: Record<string, unknown>;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    payload: Record<string, unknown> = {}
+  ) {
     super(message);
     this.status = status;
+    this.payload = payload;
   }
 }
 
@@ -39,7 +45,8 @@ export async function apiRequest<T>(
   if (!response.ok) {
     throw new ApiError(
       data.message || "Error en la solicitud",
-      response.status
+      response.status,
+      data as Record<string, unknown>
     );
   }
 

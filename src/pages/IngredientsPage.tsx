@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
-import { catalogApi, inventoryApi } from "../api/services";
+import { catalogApi } from "../api/services";
+import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import type { Ingredient } from "../types";
 
@@ -13,7 +14,6 @@ export function IngredientsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [unit, setUnit] = useState<Unit>("kg");
-  const [stockCurrent, setStockCurrent] = useState("0");
   const [stockMinimum, setStockMinimum] = useState("0");
   const [active, setActive] = useState(true);
   const [error, setError] = useState("");
@@ -35,7 +35,6 @@ export function IngredientsPage() {
     setEditingId(null);
     setName("");
     setUnit("kg");
-    setStockCurrent("0");
     setStockMinimum("0");
     setActive(true);
   };
@@ -46,7 +45,6 @@ export function IngredientsPage() {
     setEditingId(item.id);
     setName(item.name);
     setUnit(item.unit);
-    setStockCurrent(String(Number(item.stock_current)));
     setStockMinimum(String(Number(item.stock_minimum)));
     setActive(item.is_active);
   };
@@ -57,30 +55,15 @@ export function IngredientsPage() {
     setError("");
     setOk("");
 
-    const nextStock = Number(stockCurrent);
-    if (!Number.isFinite(nextStock) || nextStock < 0) {
-      setError("El stock no puede ser negativo");
-      return;
-    }
-
     setSaving(true);
     try {
       if (editingId) {
-        const current = items.find((item) => item.id === editingId);
         await catalogApi.updateIngredient(token, editingId, {
           name: name.trim(),
           unit,
           stock_minimum: Number(stockMinimum) || 0,
           is_active: active,
         });
-        if (!current || Number(current.stock_current) !== nextStock) {
-          // El stock no se edita a mano: pasa por un movimiento de ajuste
-          await inventoryApi.adjustStock(token, {
-            ingredient_id: editingId,
-            stock_current: nextStock,
-            reason: "Ajuste manual de stock",
-          });
-        }
         setOk("Ingrediente actualizado");
       } else {
         const created = await catalogApi.createIngredient(token, {
@@ -91,14 +74,7 @@ export function IngredientsPage() {
         if (!active) {
           await catalogApi.updateIngredient(token, created.id, { is_active: false });
         }
-        if (nextStock > 0) {
-          await inventoryApi.adjustStock(token, {
-            ingredient_id: created.id,
-            stock_current: nextStock,
-            reason: "Stock inicial",
-          });
-        }
-        setOk("Ingrediente registrado");
+        setOk("Ingrediente registrado. El stock se carga en Inventario.");
         resetForm();
       }
       await load();
@@ -129,8 +105,11 @@ export function IngredientsPage() {
       <div className="page-head">
         <div>
           <h1>Ingredientes</h1>
-          <p>Edita cada insumo y corrige su stock actual o el mínimo de alerta.</p>
+          <p>Alta de insumos y mínimo de alerta. El stock entra por Inventario.</p>
         </div>
+        <Link className="btn btn-ghost" to="/inventory">
+          Ir a inventario
+        </Link>
         {editingId ? (
           <button type="button" className="btn btn-ghost" onClick={resetForm}>
             Nuevo ingrediente
@@ -152,32 +131,19 @@ export function IngredientsPage() {
                 required
               />
             </label>
-            <div className="form-row">
-              <label>
-                Unidad
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value as Unit)}
-                >
-                  {UNITS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Stock actual
-                <input
-                  type="number"
-                  min="0"
-                  step="0.001"
-                  value={stockCurrent}
-                  onChange={(e) => setStockCurrent(e.target.value)}
-                  required
-                />
-              </label>
-            </div>
+            <label>
+              Unidad
+              <select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value as Unit)}
+              >
+                {UNITS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               Stock mínimo
               <input

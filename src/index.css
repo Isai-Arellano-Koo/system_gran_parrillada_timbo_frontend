@@ -1011,6 +1011,27 @@ button.badge:disabled {
   font-size: 1rem;
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 8, 6, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  z-index: 40;
+}
+
+.dialog {
+  width: min(440px, 100%);
+}
+
+.dialog textarea,
+.field textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+}
+
 .stack {
   display: grid;
   gap: 0.8rem;
