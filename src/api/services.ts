@@ -143,7 +143,17 @@ export const catalogApi = {
       token,
       body,
     }),
-  updateDish: (token: string, id: number, body: Partial<Dish>) =>
+  updateDish: (
+    token: string,
+    id: number,
+    body: Partial<{
+      name: string;
+      price: number;
+      description: string;
+      is_active: boolean;
+      status_reason: string;
+    }>
+  ) =>
     apiRequest<Dish>(`/api/catalog/dishes/${id}`, {
       method: "PATCH",
       token,

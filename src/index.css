@@ -636,9 +636,13 @@ textarea:focus {
 .list-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: end;
   gap: 1rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.list-head input {
+  max-width: 240px;
 }
 
 .list-head p,

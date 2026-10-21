@@ -15,7 +15,7 @@ const NAV: NavItem[] = [
   // Cada ítem dice qué roles lo ven
   { to: "/", label: "Resumen", icon: "home", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", icon: "orders", roles: ["admin", "mesero"] },
-  { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin"] },
+  { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin", "mesero"] },
   { to: "/ingredients", label: "Ingredientes", icon: "ingredients", roles: ["admin"] },
   { to: "/inventory", label: "Inventario", icon: "inventory", roles: ["admin"] },
   { to: "/kitchen", label: "Cocina", icon: "kitchen", roles: ["admin", "cocinero", "mesero"] },

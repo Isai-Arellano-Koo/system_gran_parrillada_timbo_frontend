@@ -29,7 +29,6 @@ export default function App() {
                 element={<ProtectedRoute roles={["admin"]} />}
               >
                 <Route path="/ingredients" element={<IngredientsPage />} />
-                <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/users/nuevo" element={<UserFormPage />} />
@@ -38,6 +37,7 @@ export default function App() {
               <Route
                 element={<ProtectedRoute roles={["admin", "mesero"]} />}
               >
+                <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
               </Route>
               <Route
