@@ -78,6 +78,16 @@ export function DishesPage() {
     setError("");
     setOk("");
 
+    if (!name.trim()) {
+      setError("El nombre es obligatorio");
+      return;
+    }
+    const nextPrice = Number(price);
+    if (!nextPrice || nextPrice <= 0) {
+      setError("El precio debe ser mayor que cero");
+      return;
+    }
+
     const filled = recipeRows.filter((row) => row.ingredient_id || row.quantity);
     const incomplete = filled.some((row) => !row.ingredient_id || !row.quantity);
     if (incomplete) {
@@ -100,7 +110,7 @@ export function DishesPage() {
       if (editingId) {
         await catalogApi.updateDish(token, editingId, {
           name: name.trim(),
-          price: Number(price),
+          price: nextPrice,
           description: description.trim(),
           is_active: active,
         });
@@ -109,12 +119,10 @@ export function DishesPage() {
       } else {
         const created = await catalogApi.createDish(token, {
           name: name.trim(),
-          price: Number(price),
+          price: nextPrice,
           description: description.trim(),
+          is_active: active,
         });
-        if (!active) {
-          await catalogApi.updateDish(token, created.id, { is_active: false });
-        }
         if (items.length) {
           await catalogApi.setRecipe(token, created.id, items);
         }
@@ -153,7 +161,10 @@ export function DishesPage() {
       <div className="page-head">
         <div>
           <h1>Carta</h1>
-          <p>Edita cada plato y asocia o cambia los ingredientes de su receta.</p>
+          <p>
+            Registra cada plato con nombre y precio. Si lo sacas de la carta, el mesero
+            no lo ve al armar el pedido.
+          </p>
         </div>
         {editingId ? (
           <button type="button" className="btn btn-ghost" onClick={resetForm}>

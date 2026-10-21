@@ -131,7 +131,12 @@ export const catalogApi = {
     ),
   createDish: (
     token: string,
-    body: { name: string; price: number; description?: string }
+    body: {
+      name: string;
+      price: number;
+      description?: string;
+      is_active?: boolean;
+    }
   ) =>
     apiRequest<Dish>("/api/catalog/dishes", {
       method: "POST",
