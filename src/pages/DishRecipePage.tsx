@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Dish, Ingredient } from "../types";
+import { dishLabel } from "../types";
 
 type RecipeLine = {
   ingredient_id: number;
@@ -182,7 +183,8 @@ export function DishRecipePage() {
               <option value="">Seleccionar plato, ej: Bife de Chorizo</option>
               {dishes.map((dish) => (
                 <option key={dish.id} value={dish.id}>
-                  {dish.name}
+                  {dish.category?.name ? `${dish.category.name} · ` : ""}
+                  {dishLabel(dish)}
                 </option>
               ))}
             </select>

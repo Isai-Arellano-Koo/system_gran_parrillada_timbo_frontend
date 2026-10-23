@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
-import type { Dish } from "../types";
+import type { Category, Dish } from "../types";
+import { dishLabel } from "../types";
 
 function recipeLabel(dish: Dish) {
   const items = dish.recipe_items || [];
@@ -21,8 +22,11 @@ export function DishesPage() {
   const navigate = useNavigate();
   const canManage = user?.role === "admin";
   const [dishes, setDishes] = useState<Dish[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
+  const [presentation, setPresentation] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
@@ -38,7 +42,12 @@ export function DishesPage() {
 
   const load = async () => {
     if (!token) return;
-    setDishes(await catalogApi.listDishes(token));
+    const [dishList, categoryList] = await Promise.all([
+      catalogApi.listDishes(token),
+      canManage ? catalogApi.listCategories(token) : Promise.resolve([]),
+    ]);
+    setDishes(dishList);
+    setCategories(categoryList);
   };
 
   useEffect(() => {
@@ -50,6 +59,8 @@ export function DishesPage() {
   const resetForm = () => {
     setEditingId(null);
     setName("");
+    setPresentation("");
+    setCategoryId("");
     setPrice("");
     setDescription("");
     setActive(true);
@@ -62,6 +73,8 @@ export function DishesPage() {
     setOk("");
     setEditingId(dish.id);
     setName(dish.name);
+    setPresentation(dish.presentation || "");
+    setCategoryId(String(dish.category_id || dish.category?.id || ""));
     setPrice(String(Number(dish.price)));
     setDescription(dish.description || "");
     setActive(dish.is_active);
@@ -77,6 +90,10 @@ export function DishesPage() {
 
     if (!name.trim()) {
       setError("El nombre es obligatorio");
+      return;
+    }
+    if (!categoryId) {
+      setError("Asigna el plato a una categoría existente");
       return;
     }
     const nextPrice = Number(price);
@@ -95,6 +112,8 @@ export function DishesPage() {
       if (editingId) {
         await catalogApi.updateDish(token, editingId, {
           name: name.trim(),
+          presentation: presentation.trim(),
+          category_id: Number(categoryId),
           price: nextPrice,
           description: description.trim(),
           is_active: active,
@@ -109,6 +128,8 @@ export function DishesPage() {
       } else {
         const created = await catalogApi.createDish(token, {
           name: name.trim(),
+          presentation: presentation.trim(),
+          category_id: Number(categoryId),
           price: nextPrice,
           description: description.trim(),
           is_active: active,
@@ -172,6 +193,8 @@ export function DishesPage() {
       const recipe = recipeLabel(dish).toLowerCase();
       return (
         dish.name.toLowerCase().includes(text) ||
+        (dish.presentation || "").toLowerCase().includes(text) ||
+        (dish.category?.name || "").toLowerCase().includes(text) ||
         (dish.description || "").toLowerCase().includes(text) ||
         recipe.includes(text)
       );
@@ -194,6 +217,9 @@ export function DishesPage() {
         </div>
         {canManage ? (
           <div className="actions">
+            <Link className="btn btn-ghost" to="/categories">
+              Categorías
+            </Link>
             <Link className="btn btn-ghost" to="/dishes/recetas">
               Recetas
             </Link>
@@ -225,6 +251,32 @@ export function DishesPage() {
                   placeholder="Ej. Parrillada Mixta"
                   required
                 />
+              </label>
+              <label>
+                Presentación
+                <input
+                  value={presentation}
+                  onChange={(e) => setPresentation(e.target.value)}
+                  placeholder="Ej. Porción, 300 g, Botella"
+                />
+              </label>
+              <label>
+                Categoría
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona una categoría</option>
+                  {categories
+                    .filter((item) => item.is_active || String(item.id) === categoryId)
+                    .map((item) => (
+                      <option key={item.id} value={item.id} disabled={!item.is_active}>
+                        {item.name}
+                        {item.is_active ? "" : " (quitada)"}
+                      </option>
+                    ))}
+                </select>
               </label>
               <label>
                 Precio (S/)
@@ -312,6 +364,7 @@ export function DishesPage() {
               <thead>
                 <tr>
                   <th>Plato</th>
+                  <th>Categoría</th>
                   <th>Precio</th>
                   <th>Receta</th>
                   <th>Estado</th>
@@ -324,15 +377,16 @@ export function DishesPage() {
                     <td>
                       {canManage ? (
                         <Link to={`/dishes/${dish.id}/receta`}>
-                          <strong>{dish.name}</strong>
+                          <strong>{dishLabel(dish)}</strong>
                         </Link>
                       ) : (
-                        <strong>{dish.name}</strong>
+                        <strong>{dishLabel(dish)}</strong>
                       )}
                       {dish.description ? (
                         <div className="hint">{dish.description}</div>
                       ) : null}
                     </td>
+                    <td>{dish.category?.name || "—"}</td>
                     <td>S/ {Number(dish.price).toFixed(2)}</td>
                     <td>{recipeLabel(dish)}</td>
                     <td>
@@ -349,7 +403,7 @@ export function DishesPage() {
                             type="button"
                             className="icon-link"
                             onClick={() => startEdit(dish)}
-                            aria-label={`Editar ${dish.name}`}
+                            aria-label={`Editar ${dishLabel(dish)}`}
                           >
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                               <path d="M12 20h9" />
@@ -402,8 +456,8 @@ export function DishesPage() {
           >
             <h2 id="dish-status-dialog-title">
               {statusTarget.is_active === false
-                ? `Reactivar ${statusTarget.name}`
-                : `Sacar ${statusTarget.name} de la carta`}
+                ? `Reactivar ${dishLabel(statusTarget)}`
+                : `Sacar ${dishLabel(statusTarget)} de la carta`}
             </h2>
             <p className="page-lead">
               El motivo queda guardado con la fecha y quién hizo el cambio.

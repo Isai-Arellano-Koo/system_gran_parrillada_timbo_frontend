@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Dish, Order, TableItem } from "../types";
+import { dishLabel } from "../types";
 
 function statusClass(status: Order["status"]) {
   if (status === "en_edicion") return "badge-edit";
@@ -256,7 +257,8 @@ export function OrdersPage() {
                       <option value="">Seleccionar...</option>
                       {dishes.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.name} — S/ {Number(d.price).toFixed(2)}
+                          {d.category?.name ? `${d.category.name} · ` : ""}
+                          {dishLabel(d)} — S/ {Number(d.price).toFixed(2)}
                         </option>
                       ))}
                     </select>
@@ -301,7 +303,7 @@ export function OrdersPage() {
                   <tbody>
                     {(activeOrder.details || []).map((d) => (
                       <tr key={d.id}>
-                        <td>{d.dish?.name || d.dish_id}</td>
+                        <td>{d.dish ? dishLabel(d.dish) : d.dish_id}</td>
                         <td>{d.quantity}</td>
                         <td>{d.observation || "—"}</td>
                         <td>

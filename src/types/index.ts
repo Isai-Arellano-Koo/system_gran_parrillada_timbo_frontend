@@ -41,14 +41,41 @@ export type RecipeItem = {
   ingredient?: Ingredient;
 };
 
-export type Dish = {
+export type CategoryDish = {
   id: number;
   name: string;
+  presentation?: string;
+  is_active: boolean;
+};
+
+export type Category = {
+  id: number;
+  name: string;
+  is_active: boolean;
+  sort_order?: number;
+  dishes?: CategoryDish[];
+};
+
+export type Dish = {
+  id: number;
+  category_id: number;
+  name: string;
+  presentation?: string;
   price: number | string;
   description?: string | null;
   is_active: boolean;
+  category_disabled?: boolean;
+  category?: Category;
   recipe_items?: RecipeItem[];
 };
+
+export function dishLabel(dish: {
+  name: string;
+  presentation?: string | null;
+}) {
+  const presentation = (dish.presentation || "").trim();
+  return presentation ? `${dish.name} — ${presentation}` : dish.name;
+}
 
 export type TableItem = {
   id: number;

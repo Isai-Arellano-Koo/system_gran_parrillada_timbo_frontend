@@ -3,6 +3,7 @@ import { loginBody } from "./loginBody";
 import type {
   LoginResponse,
   AuthResponse,
+  Category,
   Dish,
   Ingredient,
   InventoryMovement,
@@ -98,6 +99,32 @@ export const authApi = {
 };
 
 export const catalogApi = {
+  listCategories: (token: string, active = false) =>
+    apiRequest<Category[]>(
+      `/api/catalog/categories${active ? "?active=true" : ""}`,
+      { token }
+    ),
+  createCategory: (token: string, body: { name: string }) =>
+    apiRequest<Category>("/api/catalog/categories", {
+      method: "POST",
+      token,
+      body,
+    }),
+  updateCategory: (
+    token: string,
+    id: number,
+    body: Partial<{ name: string; is_active: boolean }>
+  ) =>
+    apiRequest<Category>(`/api/catalog/categories/${id}`, {
+      method: "PATCH",
+      token,
+      body,
+    }),
+  removeCategory: (token: string, id: number) =>
+    apiRequest<Category>(`/api/catalog/categories/${id}`, {
+      method: "DELETE",
+      token,
+    }),
   listIngredients: (token: string) =>
     apiRequest<Ingredient[]>("/api/catalog/ingredients", { token }),
   createIngredient: (
@@ -133,8 +160,10 @@ export const catalogApi = {
     token: string,
     body: {
       name: string;
+      presentation?: string;
       price: number;
       description?: string;
+      category_id: number;
       is_active?: boolean;
     }
   ) =>
@@ -148,8 +177,10 @@ export const catalogApi = {
     id: number,
     body: Partial<{
       name: string;
+      presentation: string;
       price: number;
       description: string;
+      category_id: number;
       is_active: boolean;
       status_reason: string;
     }>
