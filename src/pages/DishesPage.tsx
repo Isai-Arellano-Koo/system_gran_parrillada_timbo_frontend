@@ -1,28 +1,26 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish } from "../types";
 import { dishLabel } from "../types";
+import { DishRecipePage } from "./DishRecipePage";
 
-function recipeLabel(dish: Dish) {
-  const items = dish.recipe_items || [];
-  if (!items.length) return "Sin receta";
-  return items
-    .map(
-      (item) =>
-        `${item.ingredient?.name || item.ingredient_id} (${Number(item.quantity)} ${item.ingredient?.unit || ""})`
-    )
-    .join(", ");
+function hasRecipe(dish: Dish) {
+  return (dish.recipe_items || []).length > 0;
 }
 
 export function DishesPage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const canManage = user?.role === "admin";
+  const tab = params.get("tab") === "recetas" ? "recetas" : "fichas";
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryTab, setCategoryTab] = useState("all");
+  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [presentation, setPresentation] = useState("");
@@ -44,10 +42,10 @@ export function DishesPage() {
     if (!token) return;
     const [dishList, categoryList] = await Promise.all([
       catalogApi.listDishes(token),
-      canManage ? catalogApi.listCategories(token) : Promise.resolve([]),
+      catalogApi.listCategories(token, !canManage),
     ]);
     setDishes(dishList);
-    setCategories(categoryList);
+    setCategories(categoryList.filter((item) => canManage || item.is_active));
   };
 
   useEffect(() => {
@@ -55,6 +53,13 @@ export function DishesPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token, canManage]);
+
+  const setTab = (next: "fichas" | "recetas") => {
+    const nextParams = new URLSearchParams(params);
+    if (next === "fichas") nextParams.delete("tab");
+    else nextParams.set("tab", "recetas");
+    setParams(nextParams, { replace: true });
+  };
 
   const resetForm = () => {
     setEditingId(null);
@@ -66,11 +71,13 @@ export function DishesPage() {
     setActive(true);
     setOriginalActive(true);
     setFormStatusReason("");
+    setShowForm(false);
   };
 
   const startEdit = (dish: Dish) => {
     setError("");
     setOk("");
+    setShowForm(true);
     setEditingId(dish.id);
     setName(dish.name);
     setPresentation(dish.presentation || "");
@@ -172,8 +179,8 @@ export function DishesPage() {
       }
       setOk(
         is_active
-          ? `${statusTarget.name} volvió a la carta`
-          : `${statusTarget.name} quedó fuera de la carta`
+          ? `${dishLabel(statusTarget)} volvió a la carta`
+          : `${dishLabel(statusTarget)} quedó fuera de la carta`
       );
       setStatusTarget(null);
       setStatusReason("");
@@ -185,64 +192,104 @@ export function DishesPage() {
     }
   };
 
+  const visibleCategories = useMemo(
+    () => categories.filter((item) => item.is_active),
+    [categories]
+  );
+
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
     return dishes.filter((dish) => {
       if (!canManage && dish.is_active === false) return false;
+      if (categoryTab !== "all" && String(dish.category_id) !== categoryTab) {
+        return false;
+      }
       if (!text) return true;
-      const recipe = recipeLabel(dish).toLowerCase();
       return (
         dish.name.toLowerCase().includes(text) ||
         (dish.presentation || "").toLowerCase().includes(text) ||
         (dish.category?.name || "").toLowerCase().includes(text) ||
-        (dish.description || "").toLowerCase().includes(text) ||
-        recipe.includes(text)
+        (dish.description || "").toLowerCase().includes(text)
       );
     });
-  }, [dishes, query, canManage]);
+  }, [dishes, query, canManage, categoryTab]);
 
-  const inactive = dishes.filter((dish) => dish.is_active === false).length;
+  const activeCount = dishes.filter((dish) => dish.is_active).length;
+  const inactiveCount = dishes.filter((dish) => dish.is_active === false).length;
+  const withRecipe = dishes.filter(hasRecipe).length;
+  const pendingRecipe = dishes.length - withRecipe;
+
+  if (tab === "recetas" && canManage) {
+    return (
+      <div>
+        <CatalogHeader
+          canManage={canManage}
+          tab={tab}
+          onTab={setTab}
+        />
+        <DishRecipePage embedded />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <p className="crumb">Administración › Carta › Platos</p>
-          <h1>Gestión de Platos</h1>
-          <p>
-            {canManage
-              ? "Administra los platos de la carta, sus precios, recetas y disponibilidad para los meseros."
-              : "Carta activa: precios y receta de cada plato."}
-          </p>
-        </div>
-        {canManage ? (
-          <div className="actions">
-            <Link className="btn btn-ghost" to="/categories">
-              Categorías
-            </Link>
-            <Link className="btn btn-ghost" to="/dishes/recetas">
-              Recetas
-            </Link>
-            <button type="button" className="btn btn-primary" onClick={resetForm}>
-              + Nuevo Plato
-            </button>
-          </div>
-        ) : null}
-      </div>
+      <CatalogHeader canManage={canManage} tab={tab} onTab={setTab} />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {ok ? <div className="alert alert-ok">{ok}</div> : null}
 
-      <div className={canManage ? "grid-2" : undefined}>
-        {canManage ? (
-          <section className="panel">
-            <h2>{editingId ? "Editar plato" : "Registro de Plato"}</h2>
-            <p className="page-lead">
-              {editingId
-                ? "Actualiza nombre, precio y disponibilidad. La receta se edita al abrir el plato."
-                : "Completa el plato. Después se abre la receta para asociar ingredientes."}
-            </p>
-            <form className="form-grid" onSubmit={save}>
+      {canManage ? (
+        <div className="catalog-cards">
+          <article className="panel catalog-card">
+            <p className="catalog-card-kicker">Platos y Precios de Venta</p>
+            <h2>
+              {activeCount} Platos Activos / {inactiveCount} Inactivos
+            </h2>
+            <p>Registra, edita y activa platos visibles para los meseros.</p>
+            <div className="actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setShowForm(false)}
+              >
+                Ver lista
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(true);
+                }}
+              >
+                Gestionar Platos
+              </button>
+            </div>
+          </article>
+          <article className="panel catalog-card">
+            <p className="catalog-card-kicker">Asociación de Recetas e Ingredientes</p>
+            <h2>
+              {withRecipe} Recetas Configuradas / {pendingRecipe} Pendientes
+            </h2>
+            <p>Configura recetas para el control automático de stock.</p>
+            <div className="actions">
+              <Link className="btn btn-ghost" to="/dishes/recetas">
+                Ver lista
+              </Link>
+              <Link className="btn btn-primary" to="/dishes/recetas">
+                Gestionar Recetas
+              </Link>
+            </div>
+          </article>
+        </div>
+      ) : null}
+
+      {showForm && canManage ? (
+        <section className="panel">
+          <h2>{editingId ? "Editar plato" : "Registro de Plato"}</h2>
+          <form className="form-grid" onSubmit={save}>
+            <div className="form-row">
               <label>
                 Nombre del plato
                 <input
@@ -260,6 +307,8 @@ export function DishesPage() {
                   placeholder="Ej. Porción, 300 g, Botella"
                 />
               </label>
+            </div>
+            <div className="form-row">
               <label>
                 Categoría
                 <select
@@ -290,157 +339,178 @@ export function DishesPage() {
                   required
                 />
               </label>
-              <label>
-                Descripción
+            </div>
+            <label>
+              Descripción
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+            <div className="status-row">
+              <div>
+                <strong>Estado</strong>
+                <p>Activo: el mesero lo ve. Inactivo: queda fuera de la carta.</p>
+              </div>
+              <label className={`switch${active ? " on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={(e) => setActive(e.target.checked)}
+                />
+                <span className="switch-ui" />
+                <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
+              </label>
+            </div>
+            {editingId && active !== originalActive ? (
+              <label className="field">
+                <span>Motivo del cambio de estado</span>
                 <textarea
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  value={formStatusReason}
+                  onChange={(e) => setFormStatusReason(e.target.value)}
+                  rows={3}
+                  required
                 />
               </label>
-
-              <div className="status-row">
-                <div>
-                  <strong>Estado</strong>
-                  <p>Activo: el mesero lo ve. Inactivo: queda fuera de la carta.</p>
-                </div>
-                <label className={`switch${active ? " on" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={active}
-                    onChange={(e) => setActive(e.target.checked)}
-                  />
-                  <span className="switch-ui" />
-                  <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
-                </label>
-              </div>
-
-              {editingId && active !== originalActive ? (
-                <label className="field">
-                  <span>Motivo del cambio de estado</span>
-                  <textarea
-                    value={formStatusReason}
-                    onChange={(e) => setFormStatusReason(e.target.value)}
-                    rows={3}
-                    required
-                    placeholder="Ej. Fuera de temporada, se acabó el insumo, vuelve a la carta..."
-                  />
-                </label>
-              ) : null}
-
-              <div className="form-footer">
-                <button type="button" className="btn btn-ghost" onClick={resetForm}>
-                  Limpiar
-                </button>
-                <button className="btn btn-primary" type="submit" disabled={saving}>
-                  {saving
-                    ? "Guardando..."
-                    : editingId
-                      ? "Guardar cambios"
-                      : "Guardar Plato"}
-                </button>
-              </div>
-            </form>
-          </section>
-        ) : null}
-
-        <section className="panel">
-          <div className="list-head">
-            <div>
-              <h2>Lista de Platos</h2>
-              <p>
-                {visible.length} {visible.length === 1 ? "plato" : "platos"}
-              </p>
+            ) : null}
+            <div className="form-footer">
+              <button type="button" className="btn btn-ghost" onClick={resetForm}>
+                Cancelar
+              </button>
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving
+                  ? "Guardando..."
+                  : editingId
+                    ? "Guardar cambios"
+                    : "Guardar Plato"}
+              </button>
             </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar plato..."
-              aria-label="Buscar plato"
-            />
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Plato</th>
-                  <th>Categoría</th>
-                  <th>Precio</th>
-                  <th>Receta</th>
-                  <th>Estado</th>
-                  {canManage ? <th>Acciones</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((dish) => (
-                  <tr key={dish.id}>
-                    <td>
-                      {canManage ? (
-                        <Link to={`/dishes/${dish.id}/receta`}>
-                          <strong>{dishLabel(dish)}</strong>
-                        </Link>
-                      ) : (
-                        <strong>{dishLabel(dish)}</strong>
-                      )}
-                      {dish.description ? (
-                        <div className="hint">{dish.description}</div>
-                      ) : null}
-                    </td>
-                    <td>{dish.category?.name || "—"}</td>
-                    <td>S/ {Number(dish.price).toFixed(2)}</td>
-                    <td>{recipeLabel(dish)}</td>
-                    <td>
-                      <span
-                        className={`badge ${dish.is_active ? "badge-ok" : "badge-danger"}`}
-                      >
-                        {dish.is_active ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    {canManage ? (
-                      <td>
-                        <div className="actions">
-                          <button
-                            type="button"
-                            className="icon-link"
-                            onClick={() => startEdit(dish)}
-                            aria-label={`Editar ${dishLabel(dish)}`}
-                          >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                              <path d="M12 20h9" />
-                              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() => openStatusDialog(dish)}
-                          >
-                            Cambiar estado
-                          </button>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {visible.length === 0 ? (
-              <div className="empty">Aún no hay platos en la carta</div>
-            ) : null}
-          </div>
-          <div className="list-foot">
-            <span>
-              Mostrando {visible.length} de {canManage ? dishes.length : visible.length}{" "}
-              {dishes.length === 1 ? "plato" : "platos"}
-            </span>
-            {canManage ? (
-              <span>
-                {inactive === 1 ? "1 plato inactivo" : `${inactive} platos inactivos`}
-              </span>
-            ) : null}
-          </div>
+          </form>
         </section>
+      ) : null}
+
+      <div className="category-tabs" role="tablist" aria-label="Categorías de la carta">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={categoryTab === "all"}
+          className={`category-tab${categoryTab === "all" ? " active" : ""}`}
+          onClick={() => setCategoryTab("all")}
+        >
+          Todas
+        </button>
+        {visibleCategories.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={categoryTab === String(item.id)}
+            className={`category-tab${categoryTab === String(item.id) ? " active" : ""}`}
+            onClick={() => setCategoryTab(String(item.id))}
+          >
+            {item.name}
+          </button>
+        ))}
       </div>
+
+      <section className="panel">
+        <div className="list-head">
+          <div>
+            <h2>
+              {categoryTab === "all"
+                ? "Últimos platos creados"
+                : visibleCategories.find((item) => String(item.id) === categoryTab)?.name ||
+                  "Platos"}
+            </h2>
+            <p>
+              {visible.length} {visible.length === 1 ? "plato" : "platos"}
+            </p>
+          </div>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar plato..."
+            aria-label="Buscar plato"
+          />
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Plato</th>
+                <th>Precio</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((dish) => (
+                <tr key={dish.id}>
+                  <td>
+                    <strong>{dishLabel(dish)}</strong>
+                    <div className="hint">{dish.category?.name || "Sin categoría"}</div>
+                  </td>
+                  <td>S/ {Number(dish.price).toFixed(2)}</td>
+                  <td>
+                    <span
+                      className={`badge ${dish.is_active ? "badge-ok" : "badge-danger"}`}
+                    >
+                      {dish.is_active ? "Activo" : "Inactivo"}
+                    </span>
+                  </td>
+                  <td>
+                    {canManage ? (
+                      <div className="actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => startEdit(dish)}
+                        >
+                          Editar
+                        </button>
+                        <Link
+                          className="btn btn-ghost"
+                          to={`/dishes/${dish.id}/receta`}
+                        >
+                          {hasRecipe(dish) ? "Editar receta" : "Crear receta"}
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => openStatusDialog(dish)}
+                        >
+                          Estado
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="hint">
+                        {hasRecipe(dish) ? "Con receta" : "Sin receta"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {visible.length === 0 ? (
+            <div className="empty">No hay platos en esta categoría</div>
+          ) : null}
+        </div>
+        <div className="list-foot">
+          <span>
+            Mostrando {visible.length} de {canManage ? dishes.length : visible.length}{" "}
+            {dishes.length === 1 ? "plato" : "platos"}
+          </span>
+          {canManage ? (
+            <span>
+              {pendingRecipe === 1
+                ? "1 receta por configurar"
+                : `${pendingRecipe} recetas por configurar`}
+            </span>
+          ) : null}
+        </div>
+      </section>
 
       {statusTarget ? (
         <div
@@ -470,7 +540,6 @@ export function DishesPage() {
                 onChange={(e) => setStatusReason(e.target.value)}
                 rows={3}
                 required
-                placeholder="Ej. Fuera de temporada, se acabó el insumo, vuelve a la carta..."
               />
             </label>
             <div className="form-footer">
@@ -492,6 +561,57 @@ export function DishesPage() {
             </div>
           </div>
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CatalogHeader({
+  canManage,
+  tab,
+  onTab,
+}: {
+  canManage: boolean;
+  tab: "fichas" | "recetas";
+  onTab: (tab: "fichas" | "recetas") => void;
+}) {
+  return (
+    <div className="page-head catalog-head">
+      <div>
+        <p className="crumb">Administración › Carta</p>
+        <h1>Gestión de Carta y Menú</h1>
+        <p>
+          {canManage
+            ? "Administra los platos del restaurante y configura las recetas de cocina para el control automático de stock."
+            : "Carta activa por categoría, con precios de venta."}
+        </p>
+        {canManage ? (
+          <div className="page-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "fichas"}
+              className={`page-tab${tab === "fichas" ? " active" : ""}`}
+              onClick={() => onTab("fichas")}
+            >
+              Fichas
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "recetas"}
+              className={`page-tab${tab === "recetas" ? " active" : ""}`}
+              onClick={() => onTab("recetas")}
+            >
+              Recetas
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {canManage ? (
+        <Link className="btn btn-ghost" to="/categories">
+          Categorías
+        </Link>
       ) : null}
     </div>
   );

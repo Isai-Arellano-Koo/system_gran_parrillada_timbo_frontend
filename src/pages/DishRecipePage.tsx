@@ -22,7 +22,7 @@ function linesFromDish(dish: Dish | null): RecipeLine[] {
   }));
 }
 
-export function DishRecipePage() {
+export function DishRecipePage({ embedded = false }: { embedded?: boolean }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -158,16 +158,18 @@ export function DishRecipePage() {
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <p className="crumb">Administración › Carta › Recetas</p>
-          <h1>Asociación de Recetas</h1>
-          <p>Vincula ingredientes y cantidades a cada plato para el descuento de stock.</p>
+      {embedded ? null : (
+        <div className="page-head">
+          <div>
+            <p className="crumb">Administración › Carta › Recetas</p>
+            <h1>Asociación de Recetas</h1>
+            <p>Vincula ingredientes y cantidades a cada plato para el descuento de stock.</p>
+          </div>
+          <Link className="btn btn-ghost" to="/dishes">
+            Volver a fichas
+          </Link>
         </div>
-        <Link className="btn btn-primary" to="/dishes/recetas">
-          + Nueva Receta
-        </Link>
-      </div>
+      )}
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {ok ? <div className="alert alert-ok">{ok}</div> : null}

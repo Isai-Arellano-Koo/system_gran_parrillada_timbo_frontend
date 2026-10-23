@@ -1091,6 +1091,89 @@ button.badge:disabled {
   color: var(--muted);
 }
 
+.catalog-head {
+  align-items: start;
+}
+
+.page-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+
+.page-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.42rem 0.95rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.page-tab.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.catalog-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.catalog-card h2 {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 1.15rem;
+}
+
+.catalog-card p {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.88rem;
+}
+
+.catalog-card-kicker {
+  margin: 0;
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.15rem 0 0.85rem;
+  margin-bottom: 0.15rem;
+}
+
+.category-tab {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.42rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.category-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1114,7 +1197,8 @@ button.badge:disabled {
   .form-row,
   .recipe-row,
   .user-layout,
-  .user-tools {
+  .user-tools,
+  .catalog-cards {
     grid-template-columns: 1fr;
   }
 
