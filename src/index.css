@@ -658,6 +658,15 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
+#historial {
+  scroll-margin-top: 5rem;
+}
+
+.user-page .panel#historial,
+.user-page section.panel {
+  margin-top: 1rem;
+}
+
 .list-head {
   display: flex;
   justify-content: space-between;

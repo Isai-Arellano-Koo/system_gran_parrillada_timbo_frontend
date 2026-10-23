@@ -13,6 +13,7 @@ import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { KitchenPage } from "./pages/KitchenPage";
 import { UsersPage } from "./pages/UsersPage";
+import { UsersHistoryPage } from "./pages/UsersHistoryPage";
 import { UserFormPage } from "./pages/UserFormPage";
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
                 <Route path="/dishes/recetas" element={<DishRecipePage />} />
                 <Route path="/dishes/:id/receta" element={<DishRecipePage />} />
                 <Route path="/users" element={<UsersPage />} />
+                <Route path="/users/historial" element={<UsersHistoryPage />} />
                 <Route path="/users/nuevo" element={<UserFormPage />} />
                 <Route path="/users/:id" element={<UserFormPage />} />
               </Route>

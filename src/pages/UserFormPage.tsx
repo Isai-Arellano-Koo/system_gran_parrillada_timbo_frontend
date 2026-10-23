@@ -4,7 +4,8 @@ import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_OPTIONS } from "../constants/roles";
-import type { UserRole } from "../types";
+import { UserStatusHistory } from "../components/UserStatusHistory";
+import type { UserRole, UserStatusChange } from "../types";
 
 const USERNAME_RE = /^[a-z0-9.]+$/;
 
@@ -27,15 +28,19 @@ export function UserFormPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<UserStatusChange[]>([]);
+  const [historyError, setHistoryError] = useState("");
 
   const isSelf = editing && user?.id === Number(id);
 
   useEffect(() => {
     if (!editing || !token || !id) return;
     let cancelled = false;
-    usersApi
-      .get(token, Number(id))
-      .then((account) => {
+    Promise.all([
+      usersApi.get(token, Number(id)),
+      usersApi.statusChanges(token, Number(id)),
+    ])
+      .then(([account, changes]) => {
         if (cancelled) return;
         setName(account.name);
         setUsername(account.username || "");
@@ -46,10 +51,14 @@ export function UserFormPage() {
         setActive(nextActive);
         setOriginalActive(nextActive);
         setStatusReason("");
+        setHistory(changes);
       })
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "No se pudo cargar el usuario");
+          setHistoryError(
+            err instanceof ApiError ? err.message : "No se pudo cargar el historial"
+          );
         }
       })
       .finally(() => {
@@ -59,6 +68,12 @@ export function UserFormPage() {
       cancelled = true;
     };
   }, [editing, token, id]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#historial") return;
+    document.getElementById("historial")?.scrollIntoView({ behavior: "smooth" });
+  }, [loading]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -344,6 +359,22 @@ export function UserFormPage() {
             </p>
           </aside>
         </div>
+      ) : null}
+
+      {editing && !loading ? (
+        <section className="panel" id="historial">
+          <div className="list-head">
+            <div>
+              <h2>Historial de cambios</h2>
+              <p>Estado, motivo, fecha, hora y quién lo registró.</p>
+            </div>
+          </div>
+          {historyError ? (
+            <div className="alert alert-error">{historyError}</div>
+          ) : (
+            <UserStatusHistory changes={history} />
+          )}
+        </section>
       ) : null}
     </div>
   );

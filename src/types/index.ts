@@ -10,6 +10,17 @@ export type User = {
   email_verified?: boolean;
 };
 
+export type UserStatusChange = {
+  id: number;
+  user_id: number;
+  previous_is_active: boolean;
+  next_is_active: boolean;
+  reason: string;
+  created_at?: string;
+  user?: Pick<User, "id" | "name" | "username" | "email" | "role">;
+  changed_by_user?: Pick<User, "id" | "name" | "username" | "email">;
+};
+
 export type AuthResponse = {
   accessToken: string;
   user: User;

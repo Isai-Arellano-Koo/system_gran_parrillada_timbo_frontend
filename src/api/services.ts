@@ -12,6 +12,7 @@ import type {
   StockAlert,
   TableItem,
   User,
+  UserStatusChange,
 } from "../types";
 
 // Llamadas al backend agrupadas por módulo
@@ -52,17 +53,11 @@ export const usersApi = {
       token,
       body,
     }),
-  statusChanges: (token: string, id: number) =>
-    apiRequest<
-      Array<{
-        id: number;
-        previous_is_active: boolean;
-        next_is_active: boolean;
-        reason: string;
-        created_at?: string;
-        changed_by_user?: { id: number; name: string; email: string };
-      }>
-    >(`/api/users/${id}/status-changes`, { token }),
+  statusChanges: (token: string, id?: number) =>
+    apiRequest<UserStatusChange[]>(
+      id ? `/api/users/${id}/status-changes` : "/api/users/status-changes",
+      { token }
+    ),
 };
 
 export const authApi = {

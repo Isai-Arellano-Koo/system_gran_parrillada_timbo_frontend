@@ -89,9 +89,14 @@ export function UsersPage() {
           <h1>Usuarios</h1>
           <p>Gestiona los accesos de tu equipo.</p>
         </div>
-        <Link className="btn btn-primary" to="/users/nuevo">
-          + Añadir Nuevo Usuario
-        </Link>
+        <div className="actions">
+          <Link className="btn btn-ghost" to="/users/historial">
+            Historial
+          </Link>
+          <Link className="btn btn-primary" to="/users/nuevo">
+            + Añadir Nuevo Usuario
+          </Link>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
@@ -163,16 +168,24 @@ export function UsersPage() {
                       )}
                     </td>
                     <td>
-                      <Link
-                        className="icon-link"
-                        to={`/users/${item.id}`}
-                        aria-label={`Editar a ${item.name}`}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
-                        </svg>
-                      </Link>
+                      <div className="actions">
+                        <Link
+                          className="icon-link"
+                          to={`/users/${item.id}`}
+                          aria-label={`Editar a ${item.name}`}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
+                          </svg>
+                        </Link>
+                        <Link
+                          className="btn btn-ghost"
+                          to={`/users/${item.id}#historial`}
+                        >
+                          Historial
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );
