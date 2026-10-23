@@ -660,6 +660,10 @@ textarea:focus {
   padding-top: 0.85rem;
 }
 
+.table-wrap a {
+  color: inherit;
+}
+
 .icon-link {
   width: 34px;
   height: 34px;

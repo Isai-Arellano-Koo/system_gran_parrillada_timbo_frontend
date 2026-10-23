@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
 import { IngredientsPage } from "./pages/IngredientsPage";
 import { DishesPage } from "./pages/DishesPage";
+import { DishRecipePage } from "./pages/DishRecipePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { KitchenPage } from "./pages/KitchenPage";
@@ -30,6 +31,8 @@ export default function App() {
               >
                 <Route path="/ingredients" element={<IngredientsPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/dishes/recetas" element={<DishRecipePage />} />
+                <Route path="/dishes/:id/receta" element={<DishRecipePage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/users/nuevo" element={<UserFormPage />} />
                 <Route path="/users/:id" element={<UserFormPage />} />
