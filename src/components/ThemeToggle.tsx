@@ -21,7 +21,9 @@ export function ThemeToggle() {
           <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
         </svg>
       )}
-      {isDark ? "Modo claro" : "Modo oscuro"}
+      <span className="theme-toggle-label">
+        {isDark ? "Modo claro" : "Modo oscuro"}
+      </span>
     </button>
   );
 }
