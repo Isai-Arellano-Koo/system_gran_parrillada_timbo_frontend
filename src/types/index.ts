@@ -122,6 +122,7 @@ export type Order = {
   total: number | string;
   cancel_reason?: string | null;
   confirmed_at?: string | null;
+  created_at?: string;
   table?: TableItem;
   waiter?: User;
   details?: OrderDetail[];

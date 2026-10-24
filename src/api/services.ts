@@ -250,6 +250,17 @@ export const ordersApi = {
       token,
       body,
     }),
+  updateDetail: (
+    token: string,
+    orderId: number,
+    detailId: number,
+    body: { quantity?: number; observation?: string }
+  ) =>
+    apiRequest<Order>(`/api/orders/${orderId}/details/${detailId}`, {
+      method: "PATCH",
+      token,
+      body,
+    }),
   removeDetail: (token: string, orderId: number, detailId: number) =>
     apiRequest<Order>(`/api/orders/${orderId}/details/${detailId}`, {
       method: "DELETE",
