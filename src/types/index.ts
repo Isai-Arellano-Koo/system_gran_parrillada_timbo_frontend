@@ -110,6 +110,7 @@ export type KitchenTicket = {
   order_id: number;
   status: "pendiente" | "en_preparacion" | "listo" | "entregado";
   status_changed_at?: string | null;
+  created_at?: string;
   order?: Order;
 };
 
