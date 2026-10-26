@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
@@ -86,12 +87,14 @@ export function OrdersPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [ticketOpen, setTicketOpen] = useState(true);
 
   const editing = activeOrder?.status === "en_edicion";
   const canEditItems =
     activeOrder?.status === "en_edicion" || activeOrder?.status === "confirmado";
   const details = activeOrder?.details || [];
   const unsent = details.filter((detail) => !detail.sent_to_kitchen);
+  const itemCount = details.reduce((sum, detail) => sum + Number(detail.quantity), 0);
 
   const openByTable = useMemo(() => {
     const map = new Map<number, Order>();
@@ -148,6 +151,19 @@ export function OrdersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useEffect(() => {
+    if (activeOrder) setTicketOpen(true);
+  }, [activeOrder?.id]);
+
+  useEffect(() => {
+    if (!ticketOpen || !activeOrder) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTicketOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [ticketOpen, activeOrder]);
 
   const checkStock = async (orderId: number) => {
     if (!token) return;
@@ -419,6 +435,13 @@ export function OrdersPage() {
             <span className={`badge ${statusClass(activeOrder.status)}`}>
               {statusLabel(activeOrder.status)}
             </span>
+            <button
+              type="button"
+              className="btn btn-primary pos-ticket-toggle"
+              onClick={() => setTicketOpen(true)}
+            >
+              Ver pedido{itemCount ? ` · ${itemCount}` : ""}
+            </button>
           </div>
 
           {canEditItems ? (
@@ -484,8 +507,36 @@ export function OrdersPage() {
             </div>
           )}
         </section>
+      </div>
 
-        <aside className="pos-ticket">
+      {!ticketOpen
+        ? createPortal(
+            <button
+              type="button"
+              className="pos-ticket-fab"
+              onClick={() => setTicketOpen(true)}
+            >
+              <strong>Pedido</strong>
+              <span>
+                {itemCount ? `${itemCount} plato${itemCount === 1 ? "" : "s"}` : "Vacío"}
+                {" · "}
+                {money(activeOrder.total)}
+              </span>
+            </button>,
+            document.body
+          )
+        : null}
+
+      {createPortal(
+        <div className={`pos-ticket-layer${ticketOpen ? " open" : ""}`}>
+          <button
+            type="button"
+            className="pos-ticket-backdrop"
+            aria-label="Cerrar pedido"
+            tabIndex={ticketOpen ? 0 : -1}
+            onClick={() => setTicketOpen(false)}
+          />
+          <aside className="pos-ticket" aria-hidden={!ticketOpen}>
           <div className="pos-ticket-head">
             <div>
               <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
@@ -499,11 +550,21 @@ export function OrdersPage() {
                 {activeOrder.waiter?.name || user?.name || "Mesero"}
               </p>
             </div>
-            {activeOrder.kitchen_ticket ? (
-              <span className="muted">
-                {kitchenLabel(activeOrder.kitchen_ticket.status)}
-              </span>
-            ) : null}
+            <div className="pos-ticket-head-actions">
+              {activeOrder.kitchen_ticket ? (
+                <span className="muted">
+                  {kitchenLabel(activeOrder.kitchen_ticket.status)}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="pos-ticket-close"
+                aria-label="Cerrar pedido"
+                onClick={() => setTicketOpen(false)}
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="pos-ticket-lines">
@@ -701,8 +762,10 @@ export function OrdersPage() {
               Comanda: {kitchenLabel(activeOrder.kitchen_ticket.status)}
             </p>
           ) : null}
-        </aside>
-      </div>
+          </aside>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
