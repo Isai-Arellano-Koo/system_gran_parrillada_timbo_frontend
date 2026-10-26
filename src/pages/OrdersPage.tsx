@@ -260,11 +260,9 @@ export function OrdersPage() {
     setError("");
     setBusy(true);
     try {
-      await ordersApi.confirm(token, activeOrder.id);
-      setMessage("Pedido enviado a cocina. La mesa sigue ocupada.");
-      setActiveOrder(null);
-      setShortages([]);
-      await load();
+      const order = await ordersApi.confirm(token, activeOrder.id);
+      setMessage("Pedido enviado a cocina. Puedes agregar extras o cobrar.");
+      await applyOrder(order);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo confirmar");
     } finally {
@@ -394,7 +392,7 @@ export function OrdersPage() {
   }
 
   return (
-    <div className="pos-page">
+    <div className="pos-page pos-live">
       {error ? <div className="alert alert-error">{error}</div> : null}
       {message ? <div className="alert alert-ok">{message}</div> : null}
 
@@ -447,32 +445,30 @@ export function OrdersPage() {
                 ))}
               </div>
 
-              <div className="pos-dish-grid">
+              <div className="pos-dish-list">
                 {visibleDishes.map((dish) => {
                   const qty = qtyByDish.get(dish.id) || 0;
                   return (
-                    <article key={dish.id} className="pos-dish-card">
-                      <div className="pos-dish-body">
-                        <p className="pos-dish-cat">
-                          {dish.category?.name || "Carta"}
-                        </p>
-                        <h3>{dish.name}</h3>
+                    <button
+                      key={dish.id}
+                      type="button"
+                      className="pos-dish-row"
+                      disabled={busy}
+                      onClick={() => addDish(dish)}
+                    >
+                      <span className="pos-dish-info">
+                        <strong>{dish.name}</strong>
                         {dish.presentation ? (
-                          <p className="muted">{dish.presentation}</p>
-                        ) : null}
-                        <div className="pos-dish-foot">
-                          <strong>{money(dish.price)}</strong>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            disabled={busy}
-                            onClick={() => addDish(dish)}
-                          >
-                            {qty ? `Agregar · ${qty}` : "Agregar"}
-                          </button>
-                        </div>
-                      </div>
-                    </article>
+                          <em>{dish.presentation}</em>
+                        ) : (
+                          <em>{dish.category?.name || "Carta"}</em>
+                        )}
+                      </span>
+                      <span className="pos-dish-price">{money(dish.price)}</span>
+                      <span className="pos-dish-add">
+                        {qty ? `+ · ${qty}` : "+"}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
@@ -565,7 +561,7 @@ export function OrdersPage() {
                         {detail.sent_to_kitchen ? " · En cocina / mesa" : ""}
                       </p>
                     )}
-                    {canEditItems ? (
+                    {canChangeQty ? (
                       <input
                         className="pos-note"
                         value={notes[detail.id] ?? ""}
@@ -674,24 +670,23 @@ export function OrdersPage() {
                   disabled={busy}
                   onClick={sendAdditions}
                 >
-                  Enviar extras a cocina
+                  Enviar extras a cocina ({unsent.length})
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  className={`btn pos-confirm ${
-                    isSettled(activeOrder) ? "btn-ghost" : "btn-primary"
-                  }`}
-                  disabled={busy}
-                  onClick={() => markPaid(!isSettled(activeOrder))}
-                >
-                  {isSettled(activeOrder)
-                    ? "Desmarcar pago"
-                    : Number(activeOrder.amount_paid || 0) > 0
-                      ? `Cobrar saldo ${money(dueOf(activeOrder))}`
-                      : "Marcar como pagado"}
-                </button>
-              )}
+              ) : null}
+              <button
+                type="button"
+                className={`btn pos-confirm ${
+                  isSettled(activeOrder) ? "btn-ghost" : "btn-primary"
+                }`}
+                disabled={busy}
+                onClick={() => markPaid(!isSettled(activeOrder))}
+              >
+                {isSettled(activeOrder)
+                  ? "Desmarcar pago"
+                  : Number(activeOrder.amount_paid || 0) > 0
+                    ? `Cobrar saldo ${money(dueOf(activeOrder))}`
+                    : "Marcar como pagado"}
+              </button>
               <button
                 type="button"
                 className="btn btn-ghost"
