@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail, TableItem } from "../types";
-import { dishLabel } from "../types";
+import { dishLabel, orderCodeLabel } from "../types";
 import { formatTime } from "../helpers/datetime";
 
 type Shortage = {
@@ -488,18 +488,22 @@ export function OrdersPage() {
         <aside className="pos-ticket">
           <div className="pos-ticket-head">
             <div>
-              <h2>Pedido {activeOrder.code.replace(/^ORD-/, "#")}</h2>
+              <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
               <p>
                 Mesa{" "}
                 {String(activeOrder.table?.number ?? activeOrder.table_id).padStart(
                   2,
                   "0"
                 )}{" "}
-                ·{" "}
+                · {formatTime(activeOrder.created_at)} ·{" "}
                 {activeOrder.waiter?.name || user?.name || "Mesero"}
               </p>
             </div>
-            <span className="muted">{formatTime(activeOrder.created_at)}</span>
+            {activeOrder.kitchen_ticket ? (
+              <span className="muted">
+                {kitchenLabel(activeOrder.kitchen_ticket.status)}
+              </span>
+            ) : null}
           </div>
 
           <div className="pos-ticket-lines">
@@ -519,13 +523,14 @@ export function OrdersPage() {
                     <div className="pos-line-top">
                       <div>
                         <strong>
-                          {detail.dish
-                            ? dishLabel(detail.dish)
-                            : `Plato ${detail.dish_id}`}
+                          {detail.dish?.name || `Plato ${detail.dish_id}`}
                         </strong>
+                        {detail.dish?.presentation ? (
+                          <p className="muted">{detail.dish.presentation}</p>
+                        ) : null}
                         <p className="muted">{money(detail.unit_price)} c/u</p>
                       </div>
-                      <strong>{money(lineTotal(detail))}</strong>
+                      <strong className="pos-line-sum">{money(lineTotal(detail))}</strong>
                     </div>
                     {canChangeQty ? (
                       <div className="pos-line-actions">
@@ -658,11 +663,6 @@ export function OrdersPage() {
             </div>
           ) : activeOrder.status === "confirmado" ? (
             <div className="pos-ticket-foot">
-              {activeOrder.kitchen_ticket ? (
-                <p className="muted">
-                  Comanda: {kitchenLabel(activeOrder.kitchen_ticket.status)}
-                </p>
-              ) : null}
               {unsent.length ? (
                 <button
                   type="button"

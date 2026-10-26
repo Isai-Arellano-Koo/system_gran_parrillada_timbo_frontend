@@ -88,6 +88,26 @@ export function dishLabel(dish: {
   return presentation ? `${dish.name} — ${presentation}` : dish.name;
 }
 
+export function orderCodeLabel(order: {
+  id?: number;
+  code: string;
+  table_id: number;
+  table?: { number?: number } | null;
+  created_at?: string;
+}) {
+  if (/^M\d{2}-\d{4}-\d+$/i.test(order.code)) return order.code;
+  const table = String(order.table?.number ?? order.table_id).padStart(2, "0");
+  const date = order.created_at ? new Date(order.created_at) : null;
+  const ddmm =
+    date && !Number.isNaN(date.getTime())
+      ? `${String(date.getDate()).padStart(2, "0")}${String(
+          date.getMonth() + 1
+        ).padStart(2, "0")}`
+      : "";
+  const tail = order.code.match(/(\d{2,3})$/)?.[1] || String(order.id || "");
+  return ddmm ? `M${table}-${ddmm}-${tail}` : `M${table}-${tail}`;
+}
+
 export type TableItem = {
   id: number;
   number: number;
