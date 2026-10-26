@@ -1429,6 +1429,16 @@ button.badge:disabled {
   background: var(--warn-bg);
 }
 
+.table-tile.occupied.kitchen {
+  border-color: #fdba74;
+  background: var(--warn-bg);
+}
+
+.table-tile.occupied.dining {
+  border-color: #86efac;
+  background: var(--ok-bg);
+}
+
 .pos-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;

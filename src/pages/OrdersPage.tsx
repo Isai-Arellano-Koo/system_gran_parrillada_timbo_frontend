@@ -19,14 +19,36 @@ function money(value: number | string) {
 
 function statusLabel(status: Order["status"]) {
   if (status === "en_edicion") return "En edición";
-  if (status === "confirmado") return "Confirmado";
+  if (status === "confirmado") return "En mesa";
+  if (status === "cerrado") return "Cerrado";
   return "Cancelado";
 }
 
 function statusClass(status: Order["status"]) {
   if (status === "en_edicion") return "badge-edit";
   if (status === "confirmado") return "badge-ok";
+  if (status === "cerrado") return "badge-ok";
   return "badge-danger";
+}
+
+function tableState(order?: Order) {
+  if (!order) return { label: "Libre", className: "" };
+  if (order.status === "en_edicion") {
+    return { label: "En edición", className: "occupied" };
+  }
+  const kitchen = order.kitchen_ticket?.status;
+  if (kitchen === "entregado" || kitchen === "listo") {
+    return { label: "Comiendo", className: "occupied dining" };
+  }
+  return { label: "En cocina", className: "occupied kitchen" };
+}
+
+function kitchenLabel(status?: string) {
+  if (status === "pendiente") return "pendiente";
+  if (status === "en_preparacion") return "en preparación";
+  if (status === "listo") return "listo para servir";
+  if (status === "entregado") return "entregado en mesa";
+  return status || "";
 }
 
 function lineTotal(detail: OrderDetail) {
@@ -55,7 +77,9 @@ export function OrdersPage() {
   const openByTable = useMemo(() => {
     const map = new Map<number, Order>();
     for (const order of orders) {
-      if (order.status === "en_edicion") map.set(order.table_id, order);
+      if (order.status === "en_edicion" || order.status === "confirmado") {
+        map.set(order.table_id, order);
+      }
     }
     return map;
   }, [orders]);
@@ -214,7 +238,7 @@ export function OrdersPage() {
     setBusy(true);
     try {
       await ordersApi.confirm(token, activeOrder.id);
-      setMessage("Pedido confirmado y enviado a cocina");
+      setMessage("Pedido enviado a cocina. La mesa sigue ocupada.");
       setActiveOrder(null);
       setShortages([]);
       await load();
@@ -239,6 +263,23 @@ export function OrdersPage() {
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cancelar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const closeTable = async () => {
+    if (!token || !activeOrder) return;
+    setError("");
+    setBusy(true);
+    try {
+      await ordersApi.close(token, activeOrder.id);
+      setMessage("Mesa liberada. Los comensales ya se fueron.");
+      setActiveOrder(null);
+      setShortages([]);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo liberar la mesa");
     } finally {
       setBusy(false);
     }
@@ -278,16 +319,17 @@ export function OrdersPage() {
           <div className="table-grid">
             {tables.map((table) => {
               const open = openByTable.get(table.id);
+              const state = tableState(open);
               return (
                 <button
                   key={table.id}
                   type="button"
-                  className={`table-tile ${open ? "occupied" : ""}`}
+                  className={`table-tile ${state.className}`}
                   disabled={busy}
                   onClick={() => pickTable(table)}
                 >
                   <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
-                  <span>{open ? "En edición" : "Libre"}</span>
+                  <span>{state.label}</span>
                   {open ? <em>{money(open.total)}</em> : null}
                 </button>
               );
@@ -383,7 +425,9 @@ export function OrdersPage() {
             </>
           ) : (
             <div className="empty">
-              Este pedido ya no se puede editar. Vuelve a mesas para abrir otro.
+              {activeOrder.status === "confirmado"
+                ? "El pedido ya está en cocina o en la mesa. La mesa sigue ocupada hasta que los comensales se vayan."
+                : "Este pedido ya no se puede editar."}
             </div>
           )}
         </section>
@@ -531,9 +575,25 @@ export function OrdersPage() {
                 </button>
               )}
             </div>
+          ) : activeOrder.status === "confirmado" ? (
+            <div className="pos-ticket-foot">
+              {activeOrder.kitchen_ticket ? (
+                <p className="muted">
+                  Comanda: {kitchenLabel(activeOrder.kitchen_ticket.status)}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-primary pos-confirm"
+                disabled={busy}
+                onClick={closeTable}
+              >
+                Liberar mesa
+              </button>
+            </div>
           ) : activeOrder.kitchen_ticket ? (
             <p className="muted">
-              Comanda: {activeOrder.kitchen_ticket.status.replace(/_/g, " ")}
+              Comanda: {kitchenLabel(activeOrder.kitchen_ticket.status)}
             </p>
           ) : null}
         </aside>

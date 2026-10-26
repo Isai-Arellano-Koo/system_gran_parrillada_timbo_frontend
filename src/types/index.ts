@@ -119,10 +119,11 @@ export type Order = {
   code: string;
   table_id: number;
   waiter_id: number;
-  status: "en_edicion" | "confirmado" | "cancelado";
+  status: "en_edicion" | "confirmado" | "cerrado" | "cancelado";
   total: number | string;
   cancel_reason?: string | null;
   confirmed_at?: string | null;
+  closed_at?: string | null;
   created_at?: string;
   table?: TableItem;
   waiter?: User;

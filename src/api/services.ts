@@ -284,6 +284,11 @@ export const ordersApi = {
       method: "POST",
       token,
     }),
+  close: (token: string, orderId: number) =>
+    apiRequest<Order>(`/api/orders/${orderId}/close`, {
+      method: "POST",
+      token,
+    }),
   cancel: (token: string, orderId: number, reason: string) =>
     apiRequest<Order>(`/api/orders/${orderId}/cancel`, {
       method: "POST",
