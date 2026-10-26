@@ -152,7 +152,7 @@ export function InventoryPage() {
                 <th>Ingrediente</th>
                 <th>Tipo</th>
                 <th>Cantidad</th>
-                <th>Motivo</th>
+                <th>Descripción</th>
                 <th>Usuario</th>
               </tr>
             </thead>
