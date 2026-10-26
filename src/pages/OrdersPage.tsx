@@ -88,7 +88,10 @@ export function OrdersPage() {
   const [error, setError] = useState("");
 
   const editing = activeOrder?.status === "en_edicion";
+  const canEditItems =
+    activeOrder?.status === "en_edicion" || activeOrder?.status === "confirmado";
   const details = activeOrder?.details || [];
+  const unsent = details.filter((detail) => !detail.sent_to_kitchen);
 
   const openByTable = useMemo(() => {
     const map = new Map<number, Order>();
@@ -163,7 +166,7 @@ export function OrdersPage() {
       nextNotes[detail.id] = detail.observation || "";
     }
     setNotes(nextNotes);
-    if (order.status === "en_edicion") {
+    if (order.status === "en_edicion" || order.status === "confirmado") {
       await checkStock(order.id);
     } else {
       setShortages([]);
@@ -193,12 +196,15 @@ export function OrdersPage() {
   };
 
   const addDish = async (dish: Dish) => {
-    if (!token || !activeOrder || !editing) return;
+    if (!token || !activeOrder || !canEditItems) return;
     setError("");
     setBusy(true);
     try {
       const same = details.find(
-        (d) => d.dish_id === dish.id && !(d.observation || "").trim()
+        (d) =>
+          d.dish_id === dish.id &&
+          !(d.observation || "").trim() &&
+          !d.sent_to_kitchen
       );
       const order = same
         ? await ordersApi.updateDetail(token, activeOrder.id, same.id, {
@@ -217,12 +223,6 @@ export function OrdersPage() {
   };
 
   const changeQty = async (detail: OrderDetail, quantity: number) => {
-    if (!token || !activeOrder || !editing) return;
-    setBusy(true);
-    try {
-      const order =
-        quantity <= 0
-          ? await ordersApi.removeDetail(token, activeOrder.id, detail.id)
     if (!token || !activeOrder || !canEditItems) return;
     if (detail.sent_to_kitchen) return;
     setBusy(true);
@@ -243,6 +243,12 @@ export function OrdersPage() {
 
   const saveNote = async (detail: OrderDetail) => {
     if (!token || !activeOrder || !canEditItems) return;
+    const next = (notes[detail.id] || "").trim();
+    if (next === (detail.observation || "").trim()) return;
+    try {
+      const order = await ordersApi.updateDetail(token, activeOrder.id, detail.id, {
+        observation: next,
+      });
       await applyOrder(order);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
@@ -285,12 +291,6 @@ export function OrdersPage() {
     }
   };
 
-  const closeTable = async () => {
-    if (!token || !activeOrder) return;
-    setError("");
-    setBusy(true);
-    try {
-      await ordersApi.close(token, activeOrder.id);
   const sendAdditions = async () => {
     if (!token || !activeOrder || !unsent.length) return;
     setError("");
