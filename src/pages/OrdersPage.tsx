@@ -31,16 +31,32 @@ function statusClass(status: Order["status"]) {
   return "badge-danger";
 }
 
+function dueOf(order: Order) {
+  return Math.max(0, Number(order.total) - Number(order.amount_paid || 0));
+}
+
+function isSettled(order: Order) {
+  return dueOf(order) <= 0.009;
+}
+
 function tableState(order?: Order) {
   if (!order) return { label: "Libre", className: "" };
   if (order.status === "en_edicion") {
     return { label: "En edición", className: "occupied" };
   }
+  const due = dueOf(order);
+  const unpaid = due > 0.009 ? " · Sin pagar" : " · Pagado";
   const kitchen = order.kitchen_ticket?.status;
   if (kitchen === "entregado" || kitchen === "listo") {
-    return { label: "Comiendo", className: "occupied dining" };
+    return {
+      label: `Comiendo${unpaid}`,
+      className: `occupied dining${due > 0.009 ? " unpaid" : ""}`,
+    };
   }
-  return { label: "En cocina", className: "occupied kitchen" };
+  return {
+    label: `En cocina${unpaid}`,
+    className: `occupied kitchen${due > 0.009 ? " unpaid" : ""}`,
+  };
 }
 
 function kitchenLabel(status?: string) {
@@ -207,6 +223,13 @@ export function OrdersPage() {
       const order =
         quantity <= 0
           ? await ordersApi.removeDetail(token, activeOrder.id, detail.id)
+    if (!token || !activeOrder || !canEditItems) return;
+    if (detail.sent_to_kitchen) return;
+    setBusy(true);
+    try {
+      const order =
+        quantity <= 0
+          ? await ordersApi.removeDetail(token, activeOrder.id, detail.id)
           : await ordersApi.updateDetail(token, activeOrder.id, detail.id, {
               quantity,
             });
@@ -219,13 +242,7 @@ export function OrdersPage() {
   };
 
   const saveNote = async (detail: OrderDetail) => {
-    if (!token || !activeOrder || !editing) return;
-    const next = (notes[detail.id] || "").trim();
-    if (next === (detail.observation || "").trim()) return;
-    try {
-      const order = await ordersApi.updateDetail(token, activeOrder.id, detail.id, {
-        observation: next,
-      });
+    if (!token || !activeOrder || !canEditItems) return;
       await applyOrder(order);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
@@ -263,6 +280,42 @@ export function OrdersPage() {
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cancelar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const closeTable = async () => {
+    if (!token || !activeOrder) return;
+    setError("");
+    setBusy(true);
+    try {
+      await ordersApi.close(token, activeOrder.id);
+  const sendAdditions = async () => {
+    if (!token || !activeOrder || !unsent.length) return;
+    setError("");
+    setBusy(true);
+    try {
+      const order = await ordersApi.sendAdditions(token, activeOrder.id);
+      setMessage("Los platos extra se enviaron a cocina");
+      await applyOrder(order);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo enviar a cocina");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markPaid = async (paid: boolean) => {
+    if (!token || !activeOrder) return;
+    setError("");
+    setBusy(true);
+    try {
+      const order = await ordersApi.setPaid(token, activeOrder.id, paid);
+      setMessage(paid ? "Pago registrado" : "Pago desmarcado");
+      await applyOrder(order);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar el pago");
     } finally {
       setBusy(false);
     }
@@ -359,14 +412,18 @@ export function OrdersPage() {
                   "0"
                 )}
               </h1>
-              <p>Selecciona platos para agregar al ticket</p>
+              <p>
+                {editing
+                  ? "Selecciona platos para agregar al ticket"
+                  : "Puedes agregar más platos si piden extra"}
+              </p>
             </div>
             <span className={`badge ${statusClass(activeOrder.status)}`}>
               {statusLabel(activeOrder.status)}
             </span>
           </div>
 
-          {editing ? (
+          {canEditItems ? (
             <>
               <div className="category-tabs pos-tabs">
                 <button
@@ -455,21 +512,26 @@ export function OrdersPage() {
             ) : (
               details.map((detail) => {
                 const alerts = shortageFor(detail);
+                const canChangeQty = canEditItems && !detail.sent_to_kitchen;
                 return (
                   <article
                     key={detail.id}
-                    className={`pos-line ${alerts.length ? "warn" : ""}`}
+                    className={`pos-line ${alerts.length ? "warn" : ""} ${
+                      canChangeQty && !editing ? "pending" : ""
+                    }`}
                   >
                     <div className="pos-line-top">
                       <div>
                         <strong>
-                          {detail.dish ? dishLabel(detail.dish) : `Plato ${detail.dish_id}`}
+                          {detail.dish
+                            ? dishLabel(detail.dish)
+                            : `Plato ${detail.dish_id}`}
                         </strong>
                         <p className="muted">{money(detail.unit_price)} c/u</p>
                       </div>
                       <strong>{money(lineTotal(detail))}</strong>
                     </div>
-                    {editing ? (
+                    {canChangeQty ? (
                       <div className="pos-line-actions">
                         <div className="pos-qty">
                           <button
@@ -498,9 +560,12 @@ export function OrdersPage() {
                         </button>
                       </div>
                     ) : (
-                      <p className="muted">Cantidad: {detail.quantity}</p>
+                      <p className="muted">
+                        Cantidad: {detail.quantity}
+                        {detail.sent_to_kitchen ? " · En cocina / mesa" : ""}
+                      </p>
                     )}
-                    {editing ? (
+                    {canEditItems ? (
                       <input
                         className="pos-note"
                         value={notes[detail.id] ?? ""}
@@ -516,6 +581,9 @@ export function OrdersPage() {
                     ) : detail.observation ? (
                       <p className="muted">Nota: {detail.observation}</p>
                     ) : null}
+                    {canChangeQty && !editing ? (
+                      <p className="pos-stock-warn">Por enviar a cocina</p>
+                    ) : null}
                     {alerts.map((alert) => (
                       <p key={alert.name} className="pos-stock-warn">
                         Stock insuficiente de {alert.name} (solo quedan{" "}
@@ -530,13 +598,30 @@ export function OrdersPage() {
 
           <div className="pos-totals">
             <div>
-              <span>Subtotal</span>
+              <span>Total</span>
               <span>{money(activeOrder.total)}</span>
             </div>
-            <div className="pos-total">
-              <span>TOTAL</span>
-              <strong>{money(activeOrder.total)}</strong>
-            </div>
+            {activeOrder.status === "confirmado" ? (
+              <>
+                <div>
+                  <span>Ya pagado</span>
+                  <span className="ops-qty in">
+                    {money(activeOrder.amount_paid || 0)}
+                  </span>
+                </div>
+                <div className="pos-total">
+                  <span>Por cobrar</span>
+                  <strong className={dueOf(activeOrder) > 0.009 ? "ops-qty out" : ""}>
+                    {money(dueOf(activeOrder))}
+                  </strong>
+                </div>
+              </>
+            ) : (
+              <div className="pos-total">
+                <span>TOTAL</span>
+                <strong>{money(activeOrder.total)}</strong>
+              </div>
+            )}
           </div>
 
           {editing ? (
@@ -582,10 +667,35 @@ export function OrdersPage() {
                   Comanda: {kitchenLabel(activeOrder.kitchen_ticket.status)}
                 </p>
               ) : null}
+              {unsent.length ? (
+                <button
+                  type="button"
+                  className="btn btn-primary pos-confirm"
+                  disabled={busy}
+                  onClick={sendAdditions}
+                >
+                  Enviar extras a cocina
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`btn pos-confirm ${
+                    isSettled(activeOrder) ? "btn-ghost" : "btn-primary"
+                  }`}
+                  disabled={busy}
+                  onClick={() => markPaid(!isSettled(activeOrder))}
+                >
+                  {isSettled(activeOrder)
+                    ? "Desmarcar pago"
+                    : Number(activeOrder.amount_paid || 0) > 0
+                      ? `Cobrar saldo ${money(dueOf(activeOrder))}`
+                      : "Marcar como pagado"}
+                </button>
+              )}
               <button
                 type="button"
-                className="btn btn-primary pos-confirm"
-                disabled={busy}
+                className="btn btn-ghost"
+                disabled={busy || !isSettled(activeOrder) || unsent.length > 0}
                 onClick={closeTable}
               >
                 Liberar mesa

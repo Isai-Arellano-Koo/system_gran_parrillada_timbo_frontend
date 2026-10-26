@@ -284,6 +284,17 @@ export const ordersApi = {
       method: "POST",
       token,
     }),
+  sendAdditions: (token: string, orderId: number) =>
+    apiRequest<Order>(`/api/orders/${orderId}/additions`, {
+      method: "POST",
+      token,
+    }),
+  setPaid: (token: string, orderId: number, paid: boolean) =>
+    apiRequest<Order>(`/api/orders/${orderId}/paid`, {
+      method: "PATCH",
+      token,
+      body: { paid },
+    }),
   close: (token: string, orderId: number) =>
     apiRequest<Order>(`/api/orders/${orderId}/close`, {
       method: "POST",

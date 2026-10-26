@@ -102,6 +102,7 @@ export type OrderDetail = {
   quantity: number;
   unit_price: number | string;
   observation?: string | null;
+  sent_to_kitchen?: boolean;
   dish?: Dish;
 };
 
@@ -122,6 +123,9 @@ export type Order = {
   status: "en_edicion" | "confirmado" | "cerrado" | "cancelado";
   total: number | string;
   cancel_reason?: string | null;
+  paid?: boolean;
+  amount_paid?: number | string;
+  paid_at?: string | null;
   confirmed_at?: string | null;
   closed_at?: string | null;
   created_at?: string;

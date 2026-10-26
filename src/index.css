@@ -1439,6 +1439,15 @@ button.badge:disabled {
   background: var(--ok-bg);
 }
 
+.table-tile.occupied.unpaid {
+  border-color: #fca5a5;
+  background: var(--danger-bg);
+}
+
+.pos-line.pending {
+  border-color: #fdba74;
+}
+
 .pos-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
