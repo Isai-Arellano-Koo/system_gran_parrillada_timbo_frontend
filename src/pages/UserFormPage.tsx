@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { ROLE_OPTIONS } from "../constants/roles";
+import { ROLE_OPTIONS, roleAvatar } from "../constants/roles";
 import { UserStatusHistory } from "../components/UserStatusHistory";
 import type { UserRole, UserStatusChange } from "../types";
 
@@ -346,7 +346,11 @@ export function UserFormPage() {
                 disabled={isSelf}
                 onClick={() => setRole(item.value)}
               >
-                <span className="role-mark">{item.label.slice(0, 1)}</span>
+                <img
+                  className="role-mark"
+                  src={roleAvatar(item.value)}
+                  alt=""
+                />
                 <span>
                   <strong>{item.label}</strong>
                   <small>{item.description}</small>

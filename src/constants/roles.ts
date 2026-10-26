@@ -30,3 +30,7 @@ export const ROLE_OPTIONS: {
 export function roleLabel(role: UserRole) {
   return ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role;
 }
+
+export function roleAvatar(role: UserRole) {
+  return `/perfil-${role}.jpg`;
+}

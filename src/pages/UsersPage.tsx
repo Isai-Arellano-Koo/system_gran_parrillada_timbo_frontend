@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { ROLE_OPTIONS, roleLabel } from "../constants/roles";
+import { ROLE_OPTIONS, roleAvatar, roleLabel } from "../constants/roles";
 import type { User, UserRole } from "../types";
 
 export function UsersPage() {
@@ -148,8 +148,17 @@ export function UsersPage() {
                 return (
                   <tr key={item.id}>
                     <td>
-                      <strong>{item.name}</strong>
-                      {isSelf ? <div className="hint">Tu cuenta</div> : null}
+                      <div className="user-name-cell">
+                        <img
+                          className="user-avatar"
+                          src={roleAvatar(item.role)}
+                          alt={roleLabel(item.role)}
+                        />
+                        <div>
+                          <strong>{item.name}</strong>
+                          {isSelf ? <div className="hint">Tu cuenta</div> : null}
+                        </div>
+                      </div>
                     </td>
                     <td>{item.username || "—"}</td>
                     <td>{roleLabel(item.role)}</td>

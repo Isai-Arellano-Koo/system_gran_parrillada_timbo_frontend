@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { roleLabel } from "../constants/roles";
+import { roleAvatar, roleLabel } from "../constants/roles";
 import { ThemeToggle } from "./ThemeToggle";
 import type { UserRole } from "../types";
 
@@ -22,15 +22,6 @@ const NAV: NavItem[] = [
   { to: "/kitchen", label: "Cocina", icon: "kitchen", roles: ["admin", "cocinero", "mesero"] },
   { to: "/users", label: "Usuarios", icon: "users", roles: ["admin"] },
 ];
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 function NavIcon({ name }: { name: NavItem["icon"] }) {
   if (name === "home") {
@@ -194,7 +185,11 @@ export function AppLayout() {
             <ThemeToggle />
             {user ? (
               <div className="topbar-user">
-                <span className="topbar-avatar">{initials(user.name)}</span>
+                <img
+                  className="topbar-avatar"
+                  src={roleAvatar(user.role)}
+                  alt={roleLabel(user.role)}
+                />
                 <div className="topbar-user-text">
                   <strong>{user.name}</strong>
                   <span>{roleLabel(user.role)}</span>

@@ -256,12 +256,23 @@ button {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
+  object-fit: cover;
+  display: block;
   background: #fff7ed;
-  color: #c2410c;
-  font-size: 0.75rem;
-  font-weight: 700;
+}
+
+.user-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
 }
 
 .topbar-user strong,
@@ -630,20 +641,16 @@ textarea:focus {
 }
 
 .role-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
   background: var(--bg-elevated);
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 700;
 }
 
 .role-card.on .role-mark {
-  background: #ffedd5;
-  color: #c2410c;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .role-check {
