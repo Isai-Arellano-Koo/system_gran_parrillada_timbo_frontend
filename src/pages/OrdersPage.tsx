@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail, TableItem } from "../types";
-import { dishLabel, orderCodeLabel } from "../types";
+import { dishLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
 import { formatTime } from "../helpers/datetime";
 
 type Shortage = {
@@ -48,24 +48,22 @@ function tableState(order?: Order) {
   const due = dueOf(order);
   const unpaid = due > 0.009 ? " · Sin pagar" : " · Pagado";
   const kitchen = order.kitchen_ticket?.status;
-  if (kitchen === "entregado" || kitchen === "listo") {
+  if (kitchen === "entregado") {
     return {
-      label: `Comiendo${unpaid}`,
+      label: `En mesa${unpaid}`,
       className: `occupied dining${due > 0.009 ? " unpaid" : ""}`,
+    };
+  }
+  if (kitchen === "listo") {
+    return {
+      label: `Por entregar${unpaid}`,
+      className: `occupied ready${due > 0.009 ? " unpaid" : ""}`,
     };
   }
   return {
     label: `En cocina${unpaid}`,
     className: `occupied kitchen${due > 0.009 ? " unpaid" : ""}`,
   };
-}
-
-function kitchenLabel(status?: string) {
-  if (status === "pendiente") return "pendiente";
-  if (status === "en_preparacion") return "en preparación";
-  if (status === "listo") return "listo para servir";
-  if (status === "entregado") return "entregado en mesa";
-  return status || "";
 }
 
 function lineTotal(detail: OrderDetail) {
@@ -421,7 +419,12 @@ export function OrdersPage() {
             </button>
           </div>
         ) : (
-          <p className="muted">Cantidad: {detail.quantity}</p>
+          <p className="muted">
+            Cantidad: {detail.quantity}
+            {sentLine
+              ? ` · ${kitchenStatusLabel(detail.kitchen_status || "pendiente")}`
+              : ""}
+          </p>
         )}
         {canChangeQty ? (
           <input
@@ -638,7 +641,7 @@ export function OrdersPage() {
             <div className="pos-ticket-head-actions">
               {activeOrder.kitchen_ticket ? (
                 <span className="muted">
-                  {kitchenLabel(activeOrder.kitchen_ticket.status)}
+                  {kitchenStatusLabel(activeOrder.kitchen_ticket.status)}
                 </span>
               ) : null}
               <button
@@ -783,7 +786,7 @@ export function OrdersPage() {
             </div>
           ) : activeOrder.kitchen_ticket ? (
             <p className="muted">
-              Comanda: {kitchenLabel(activeOrder.kitchen_ticket.status)}
+              Comanda: {kitchenStatusLabel(activeOrder.kitchen_ticket.status)}
             </p>
           ) : null}
           </aside>

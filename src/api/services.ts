@@ -321,4 +321,14 @@ export const kitchenApi = {
       token,
       body: { status },
     }),
+  updateDishStatus: (
+    token: string,
+    detailId: number,
+    status: KitchenTicket["status"]
+  ) =>
+    apiRequest<KitchenTicket>(`/api/kitchen/details/${detailId}/status`, {
+      method: "PATCH",
+      token,
+      body: { status },
+    }),
 };

@@ -123,8 +123,17 @@ export type OrderDetail = {
   unit_price: number | string;
   observation?: string | null;
   sent_to_kitchen?: boolean;
+  kitchen_status?: "pendiente" | "en_preparacion" | "listo" | "entregado";
   dish?: Dish;
 };
+
+export function kitchenStatusLabel(status?: string) {
+  if (status === "pendiente") return "Pendiente";
+  if (status === "en_preparacion") return "En preparación";
+  if (status === "listo") return "Listo para servir";
+  if (status === "entregado") return "En mesa";
+  return status || "";
+}
 
 export type KitchenTicket = {
   id: number;
