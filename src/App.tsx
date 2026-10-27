@@ -7,10 +7,13 @@ import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
 import { IngredientsPage } from "./pages/IngredientsPage";
 import { DishesPage } from "./pages/DishesPage";
+import { CategoriesPage } from "./pages/CategoriesPage";
+import { DishRecipePage } from "./pages/DishRecipePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { KitchenPage } from "./pages/KitchenPage";
 import { UsersPage } from "./pages/UsersPage";
+import { UsersHistoryPage } from "./pages/UsersHistoryPage";
 import { UserFormPage } from "./pages/UserFormPage";
 
 export default function App() {
@@ -21,6 +24,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
+          {/* Sin sesión no entra al resto de la app */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<HomePage />} />
@@ -28,15 +32,19 @@ export default function App() {
                 element={<ProtectedRoute roles={["admin"]} />}
               >
                 <Route path="/ingredients" element={<IngredientsPage />} />
-                <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
+                <Route path="/dishes/recetas" element={<DishRecipePage />} />
+                <Route path="/dishes/:id/receta" element={<DishRecipePage />} />
                 <Route path="/users" element={<UsersPage />} />
+                <Route path="/users/historial" element={<UsersHistoryPage />} />
                 <Route path="/users/nuevo" element={<UserFormPage />} />
                 <Route path="/users/:id" element={<UserFormPage />} />
               </Route>
               <Route
                 element={<ProtectedRoute roles={["admin", "mesero"]} />}
               >
+                <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
               </Route>
               <Route

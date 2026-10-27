@@ -3,6 +3,7 @@ import { loginBody } from "./loginBody";
 import type {
   LoginResponse,
   AuthResponse,
+  Category,
   Dish,
   Ingredient,
   InventoryMovement,
@@ -11,8 +12,10 @@ import type {
   StockAlert,
   TableItem,
   User,
+  UserStatusChange,
 } from "../types";
 
+// Llamadas al backend agrupadas por módulo
 export const usersApi = {
   list: (token: string) => apiRequest<User[]>("/api/users", { token }),
   get: (token: string, id: number) =>
@@ -42,6 +45,7 @@ export const usersApi = {
       password: string;
       role: User["role"];
       is_active: boolean;
+      status_reason: string;
     }>
   ) =>
     apiRequest<User>(`/api/users/${id}`, {
@@ -49,6 +53,11 @@ export const usersApi = {
       token,
       body,
     }),
+  statusChanges: (token: string, id?: number) =>
+    apiRequest<UserStatusChange[]>(
+      id ? `/api/users/${id}/status-changes` : "/api/users/status-changes",
+      { token }
+    ),
 };
 
 export const authApi = {
@@ -67,11 +76,50 @@ export const authApi = {
       method: "POST",
       body: { confirmationToken },
     }),
+  requestPasswordReset: (identifier: string) =>
+    apiRequest<{ message: string; emailHint?: string }>(
+      "/api/auth/password-reset",
+      {
+        method: "POST",
+        body: loginBody(identifier, "-"),
+      }
+    ),
+  confirmPasswordReset: (identifier: string, code: string, password: string) =>
+    apiRequest<{ message: string }>("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: { ...loginBody(identifier, password), code },
+    }),
   me: (token: string) =>
     apiRequest<User>("/api/auth/me", { token }),
 };
 
 export const catalogApi = {
+  listCategories: (token: string, active = false) =>
+    apiRequest<Category[]>(
+      `/api/catalog/categories${active ? "?active=true" : ""}`,
+      { token }
+    ),
+  createCategory: (token: string, body: { name: string }) =>
+    apiRequest<Category>("/api/catalog/categories", {
+      method: "POST",
+      token,
+      body,
+    }),
+  updateCategory: (
+    token: string,
+    id: number,
+    body: Partial<{ name: string; is_active: boolean }>
+  ) =>
+    apiRequest<Category>(`/api/catalog/categories/${id}`, {
+      method: "PATCH",
+      token,
+      body,
+    }),
+  removeCategory: (token: string, id: number) =>
+    apiRequest<Category>(`/api/catalog/categories/${id}`, {
+      method: "DELETE",
+      token,
+    }),
   listIngredients: (token: string) =>
     apiRequest<Ingredient[]>("/api/catalog/ingredients", { token }),
   createIngredient: (
@@ -86,7 +134,12 @@ export const catalogApi = {
   updateIngredient: (
     token: string,
     id: number,
-    body: Partial<Ingredient>
+    body: Partial<{
+      name: string;
+      unit: string;
+      stock_minimum: number;
+      is_active: boolean;
+    }>
   ) =>
     apiRequest<Ingredient>(`/api/catalog/ingredients/${id}`, {
       method: "PATCH",
@@ -100,14 +153,33 @@ export const catalogApi = {
     ),
   createDish: (
     token: string,
-    body: { name: string; price: number; description?: string }
+    body: {
+      name: string;
+      presentation?: string;
+      price: number;
+      description?: string;
+      category_id: number;
+      is_active?: boolean;
+    }
   ) =>
     apiRequest<Dish>("/api/catalog/dishes", {
       method: "POST",
       token,
       body,
     }),
-  updateDish: (token: string, id: number, body: Partial<Dish>) =>
+  updateDish: (
+    token: string,
+    id: number,
+    body: Partial<{
+      name: string;
+      presentation: string;
+      price: number;
+      description: string;
+      category_id: number;
+      is_active: boolean;
+      status_reason: string;
+    }>
+  ) =>
     apiRequest<Dish>(`/api/catalog/dishes/${id}`, {
       method: "PATCH",
       token,
@@ -178,6 +250,17 @@ export const ordersApi = {
       token,
       body,
     }),
+  updateDetail: (
+    token: string,
+    orderId: number,
+    detailId: number,
+    body: { quantity?: number; observation?: string }
+  ) =>
+    apiRequest<Order>(`/api/orders/${orderId}/details/${detailId}`, {
+      method: "PATCH",
+      token,
+      body,
+    }),
   removeDetail: (token: string, orderId: number, detailId: number) =>
     apiRequest<Order>(`/api/orders/${orderId}/details/${detailId}`, {
       method: "DELETE",
@@ -201,6 +284,22 @@ export const ordersApi = {
       method: "POST",
       token,
     }),
+  sendAdditions: (token: string, orderId: number) =>
+    apiRequest<Order>(`/api/orders/${orderId}/additions`, {
+      method: "POST",
+      token,
+    }),
+  setPaid: (token: string, orderId: number, paid: boolean) =>
+    apiRequest<Order>(`/api/orders/${orderId}/paid`, {
+      method: "PATCH",
+      token,
+      body: { paid },
+    }),
+  close: (token: string, orderId: number) =>
+    apiRequest<Order>(`/api/orders/${orderId}/close`, {
+      method: "POST",
+      token,
+    }),
   cancel: (token: string, orderId: number, reason: string) =>
     apiRequest<Order>(`/api/orders/${orderId}/cancel`, {
       method: "POST",
@@ -218,6 +317,16 @@ export const kitchenApi = {
     status: KitchenTicket["status"]
   ) =>
     apiRequest<KitchenTicket>(`/api/kitchen/${ticketId}/status`, {
+      method: "PATCH",
+      token,
+      body: { status },
+    }),
+  updateDishStatus: (
+    token: string,
+    detailId: number,
+    status: KitchenTicket["status"]
+  ) =>
+    apiRequest<KitchenTicket>(`/api/kitchen/details/${detailId}/status`, {
       method: "PATCH",
       token,
       body: { status },

@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { ROLE_OPTIONS, roleLabel } from "../constants/roles";
+import { ROLE_OPTIONS, roleAvatar, roleLabel } from "../constants/roles";
 import type { User, UserRole } from "../types";
 
 export function UsersPage() {
@@ -17,6 +17,8 @@ export function UsersPage() {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
+  const [statusTarget, setStatusTarget] = useState<User | null>(null);
+  const [statusReason, setStatusReason] = useState("");
 
   const load = async () => {
     if (!token) return;
@@ -29,19 +31,34 @@ export function UsersPage() {
     );
   }, [token]);
 
-  const toggleActive = async (item: User) => {
-    if (!token) return;
+  const openStatusDialog = (item: User) => {
     setError("");
     setOk("");
-    setSavingId(item.id);
+    setStatusTarget(item);
+    setStatusReason("");
+  };
+
+  const confirmStatusChange = async () => {
+    if (!token || !statusTarget) return;
+    const reason = statusReason.trim();
+    if (reason.length < 3) {
+      setError("Indica el motivo del cambio de estado");
+      return;
+    }
+    setSavingId(statusTarget.id);
     try {
-      const is_active = item.is_active === false;
-      await usersApi.update(token, item.id, { is_active });
+      const is_active = statusTarget.is_active === false;
+      await usersApi.update(token, statusTarget.id, {
+        is_active,
+        status_reason: reason,
+      });
       setOk(
         is_active
-          ? `${item.name} puede iniciar sesión de nuevo`
-          : `Acceso de ${item.name} suspendido`
+          ? `${statusTarget.name} puede iniciar sesión de nuevo`
+          : `Acceso de ${statusTarget.name} suspendido`
       );
+      setStatusTarget(null);
+      setStatusReason("");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar el estado");
@@ -72,9 +89,14 @@ export function UsersPage() {
           <h1>Usuarios</h1>
           <p>Gestiona los accesos de tu equipo.</p>
         </div>
-        <Link className="btn btn-primary" to="/users/nuevo">
-          + Añadir Nuevo Usuario
-        </Link>
+        <div className="actions">
+          <Link className="btn btn-ghost" to="/users/historial">
+            Historial
+          </Link>
+          <Link className="btn btn-primary" to="/users/nuevo">
+            + Añadir Nuevo Usuario
+          </Link>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
@@ -126,8 +148,17 @@ export function UsersPage() {
                 return (
                   <tr key={item.id}>
                     <td>
-                      <strong>{item.name}</strong>
-                      {isSelf ? <div className="hint">Tu cuenta</div> : null}
+                      <div className="user-name-cell">
+                        <img
+                          className="user-avatar"
+                          src={roleAvatar(item.role)}
+                          alt={roleLabel(item.role)}
+                        />
+                        <div>
+                          <strong>{item.name}</strong>
+                          {isSelf ? <div className="hint">Tu cuenta</div> : null}
+                        </div>
+                      </div>
                     </td>
                     <td>{item.username || "—"}</td>
                     <td>{roleLabel(item.role)}</td>
@@ -139,23 +170,31 @@ export function UsersPage() {
                           type="button"
                           className={`badge ${item.is_active === false ? "badge-danger" : "badge-ok"}`}
                           disabled={isSelf || busy}
-                          onClick={() => toggleActive(item)}
+                          onClick={() => openStatusDialog(item)}
                         >
                           {item.is_active === false ? "Inactivo" : "Activo"}
                         </button>
                       )}
                     </td>
                     <td>
-                      <Link
-                        className="icon-link"
-                        to={`/users/${item.id}`}
-                        aria-label={`Editar a ${item.name}`}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
-                        </svg>
-                      </Link>
+                      <div className="actions">
+                        <Link
+                          className="icon-link"
+                          to={`/users/${item.id}`}
+                          aria-label={`Editar a ${item.name}`}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
+                          </svg>
+                        </Link>
+                        <Link
+                          className="btn btn-ghost"
+                          to={`/users/${item.id}#historial`}
+                        >
+                          Historial
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -175,6 +214,54 @@ export function UsersPage() {
           </span>
         </div>
       </section>
+
+      {statusTarget ? (
+        <div className="dialog-backdrop" role="presentation" onClick={() => setStatusTarget(null)}>
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-labelledby="status-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="status-dialog-title">
+              {statusTarget.is_active === false
+                ? `Reactivar a ${statusTarget.name}`
+                : `Suspender a ${statusTarget.name}`}
+            </h2>
+            <p className="page-lead">
+              El motivo queda guardado con la fecha y quién hizo el cambio.
+            </p>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <label className="field">
+              <span>Motivo</span>
+              <textarea
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+                rows={3}
+                required
+                placeholder="Ej. Fin de contrato, error de acceso, reincorporación..."
+              />
+            </label>
+            <div className="form-footer">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setStatusTarget(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={savingId === statusTarget.id}
+                onClick={confirmStatusChange}
+              >
+                {savingId === statusTarget.id ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

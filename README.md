@@ -152,7 +152,7 @@ Cubre el armado del cuerpo de login (correo si el identificador contiene `@`, us
 | Alessandro Del Piero Chavarria Medina | Scrum Master / Developer | Facilitación de Scrum, seguimiento del tablero y README |
 | Isai Kaleb Arellano Koo | Developer | Desarrollo del backend y del frontend (código y base de datos) |
 | Paul Marcelo Challco Peña | Integrator / UX-UI | Informe técnico y documentación |
-| Victor Samir Huallpa Alvites | Developer Desarrollo; apoyo a Isai y a Mateo en distintas historias |
+| Victor Samir Huallpa Alvites | Developer | Desarrollo; apoyo a Isai y a Mateo en distintas historias |
 
 ## Uso de herramientas de IA
 

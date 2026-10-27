@@ -1,34 +1,27 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { roleLabel } from "../constants/roles";
+import { roleAvatar, roleLabel } from "../constants/roles";
 import { ThemeToggle } from "./ThemeToggle";
 import type { UserRole } from "../types";
 
 type NavItem = {
   to: string;
   label: string;
-  icon: "home" | "orders" | "dishes" | "ingredients" | "inventory" | "kitchen" | "users";
+  icon: "home" | "orders" | "dishes" | "categories" | "ingredients" | "inventory" | "kitchen" | "users";
   roles: UserRole[];
 };
 
 const NAV: NavItem[] = [
   { to: "/", label: "Resumen", icon: "home", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", icon: "orders", roles: ["admin", "mesero"] },
-  { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin"] },
+  { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin", "mesero"] },
+  { to: "/categories", label: "Categorías", icon: "categories", roles: ["admin"] },
   { to: "/ingredients", label: "Ingredientes", icon: "ingredients", roles: ["admin"] },
   { to: "/inventory", label: "Inventario", icon: "inventory", roles: ["admin"] },
   { to: "/kitchen", label: "Cocina", icon: "kitchen", roles: ["admin", "cocinero", "mesero"] },
   { to: "/users", label: "Usuarios", icon: "users", roles: ["admin"] },
 ];
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 function NavIcon({ name }: { name: NavItem["icon"] }) {
   if (name === "home") {
@@ -54,6 +47,14 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
       <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 10h16M6 10a6 6 0 0 0 12 0" />
         <path d="M12 16v3M9 19h6" />
+      </svg>
+    );
+  }
+  if (name === "categories") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 6h16M4 12h10M4 18h16" />
+        <circle cx="18" cy="12" r="2" />
       </svg>
     );
   }
@@ -92,11 +93,38 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
   const links = NAV.filter((item) => user && item.roles.includes(user.role));
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell${menuOpen ? " nav-open" : ""}`}>
+      <button
+        type="button"
+        className="nav-backdrop"
+        aria-label="Cerrar menú"
+        tabIndex={menuOpen ? 0 : -1}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      <aside className="sidebar" id="app-sidebar">
         <div className="brand">
           <img className="brand-logo" src="/LOGO_TIMBO.png" alt="Gran Parrillada Timbó" />
         </div>
@@ -114,7 +142,7 @@ export function AppLayout() {
               }
             >
               <NavIcon name={item.icon} />
-              {item.label}
+              <span className="nav-label">{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -125,20 +153,44 @@ export function AppLayout() {
               <path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2" />
               <path d="M15 12H3m0 0 3-3M3 12l3 3" />
             </svg>
-            Cerrar sesión
+            <span className="nav-label">Cerrar sesión</span>
           </button>
         </div>
       </aside>
 
       <div className="workspace">
         <header className="topbar">
-          <div className="topbar-title">Gran Parrillada Timbó</div>
+          <div className="topbar-start">
+            <button
+              type="button"
+              className="menu-btn"
+              aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={menuOpen}
+              aria-controls="app-sidebar"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              {menuOpen ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              )}
+            </button>
+            <div className="topbar-title">Gran Parrillada Timbó</div>
+          </div>
           <div className="topbar-actions">
             <ThemeToggle />
             {user ? (
               <div className="topbar-user">
-                <span className="topbar-avatar">{initials(user.name)}</span>
-                <div>
+                <img
+                  className="topbar-avatar"
+                  src={roleAvatar(user.role)}
+                  alt={roleLabel(user.role)}
+                />
+                <div className="topbar-user-text">
                   <strong>{user.name}</strong>
                   <span>{roleLabel(user.role)}</span>
                 </div>

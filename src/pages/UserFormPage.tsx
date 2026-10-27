@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { ROLE_OPTIONS } from "../constants/roles";
-import type { UserRole } from "../types";
+import { ROLE_OPTIONS, roleAvatar } from "../constants/roles";
+import { UserStatusHistory } from "../components/UserStatusHistory";
+import type { UserRole, UserStatusChange } from "../types";
 
 const USERNAME_RE = /^[a-z0-9.]+$/;
 
@@ -22,29 +23,42 @@ export function UserFormPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("mesero");
   const [active, setActive] = useState(true);
+  const [originalActive, setOriginalActive] = useState(true);
+  const [statusReason, setStatusReason] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<UserStatusChange[]>([]);
+  const [historyError, setHistoryError] = useState("");
 
   const isSelf = editing && user?.id === Number(id);
 
   useEffect(() => {
     if (!editing || !token || !id) return;
     let cancelled = false;
-    usersApi
-      .get(token, Number(id))
-      .then((account) => {
+    Promise.all([
+      usersApi.get(token, Number(id)),
+      usersApi.statusChanges(token, Number(id)),
+    ])
+      .then(([account, changes]) => {
         if (cancelled) return;
         setName(account.name);
         setUsername(account.username || "");
         setEmail(account.email);
         setEmailVerified(account.email_verified !== false);
         setRole(account.role);
-        setActive(account.is_active !== false);
+        const nextActive = account.is_active !== false;
+        setActive(nextActive);
+        setOriginalActive(nextActive);
+        setStatusReason("");
+        setHistory(changes);
       })
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "No se pudo cargar el usuario");
+          setHistoryError(
+            err instanceof ApiError ? err.message : "No se pudo cargar el historial"
+          );
         }
       })
       .finally(() => {
@@ -54,6 +68,12 @@ export function UserFormPage() {
       cancelled = true;
     };
   }, [editing, token, id]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#historial") return;
+    document.getElementById("historial")?.scrollIntoView({ behavior: "smooth" });
+  }, [loading]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -74,6 +94,10 @@ export function UserFormPage() {
       setError("La contraseña debe tener al menos 8 caracteres");
       return;
     }
+    if (editing && emailVerified && active !== originalActive && statusReason.trim().length < 3) {
+      setError("Indica el motivo del cambio de estado");
+      return;
+    }
     setSaving(true);
     try {
       if (editing && id) {
@@ -83,6 +107,9 @@ export function UserFormPage() {
           email: cleanEmail,
           role,
           ...(emailVerified ? { is_active: active } : {}),
+          ...(emailVerified && active !== originalActive
+            ? { status_reason: statusReason.trim() }
+            : {}),
           ...(password ? { password } : {}),
         });
         if (isSelf) {
@@ -98,6 +125,7 @@ export function UserFormPage() {
         return;
       }
 
+      // La cuenta nace deshabilitada. Se activa al confirmar el correo
       await usersApi.create(token, {
         name: name.trim(),
         username: cleanUsername,
@@ -275,6 +303,21 @@ export function UserFormPage() {
               </div>
             )}
 
+            {editing && emailVerified && active !== originalActive && !isSelf ? (
+              <label className="field">
+                <span>
+                  Motivo del cambio de estado <em>*</em>
+                </span>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  rows={3}
+                  required
+                  placeholder="Queda registrado quién lo cambió, cuándo y por qué."
+                />
+              </label>
+            ) : null}
+
             <div className="form-footer">
               <Link className="btn btn-ghost" to="/users">
                 Cancelar
@@ -303,7 +346,11 @@ export function UserFormPage() {
                 disabled={isSelf}
                 onClick={() => setRole(item.value)}
               >
-                <span className="role-mark">{item.label.slice(0, 1)}</span>
+                <img
+                  className="role-mark"
+                  src={roleAvatar(item.value)}
+                  alt=""
+                />
                 <span>
                   <strong>{item.label}</strong>
                   <small>{item.description}</small>
@@ -316,6 +363,22 @@ export function UserFormPage() {
             </p>
           </aside>
         </div>
+      ) : null}
+
+      {editing && !loading ? (
+        <section className="panel" id="historial">
+          <div className="list-head">
+            <div>
+              <h2>Historial de cambios</h2>
+              <p>Estado, motivo, fecha, hora y quién lo registró.</p>
+            </div>
+          </div>
+          {historyError ? (
+            <div className="alert alert-error">{historyError}</div>
+          ) : (
+            <UserStatusHistory changes={history} />
+          )}
+        </section>
       ) : null}
     </div>
   );

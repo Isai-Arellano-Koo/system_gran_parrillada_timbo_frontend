@@ -1,97 +1,116 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
-import type { Dish, Ingredient } from "../types";
+import type { Category, Dish } from "../types";
+import { dishLabel } from "../types";
+import { DishRecipePage } from "./DishRecipePage";
 
-type RecipeRow = { ingredient_id: string; quantity: string };
-
-const emptyRow = (): RecipeRow => ({ ingredient_id: "", quantity: "" });
-
-function rowsFromDish(dish: Dish): RecipeRow[] {
-  const rows = (dish.recipe_items || []).map((item) => ({
-    ingredient_id: String(item.ingredient_id),
-    quantity: String(item.quantity),
-  }));
-  return rows.length ? rows : [emptyRow()];
+function hasRecipe(dish: Dish) {
+  return (dish.recipe_items || []).length > 0;
 }
 
 export function DishesPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const canManage = user?.role === "admin";
+  const tab = params.get("tab") === "recetas" ? "recetas" : "fichas";
   const [dishes, setDishes] = useState<Dish[]>([]);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryTab, setCategoryTab] = useState("all");
+  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
+  const [presentation, setPresentation] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
-  const [recipeRows, setRecipeRows] = useState<RecipeRow[]>([emptyRow()]);
+  const [originalActive, setOriginalActive] = useState(true);
+  const [formStatusReason, setFormStatusReason] = useState("");
+  const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [saving, setSaving] = useState(false);
+  const [statusTarget, setStatusTarget] = useState<Dish | null>(null);
+  const [statusReason, setStatusReason] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
 
   const load = async () => {
     if (!token) return;
-    const [dishList, ingredientList] = await Promise.all([
+    const [dishList, categoryList] = await Promise.all([
       catalogApi.listDishes(token),
-      catalogApi.listIngredients(token),
+      catalogApi.listCategories(token, !canManage),
     ]);
     setDishes(dishList);
-    setIngredients(ingredientList);
+    setCategories(categoryList.filter((item) => canManage || item.is_active));
   };
 
   useEffect(() => {
     load().catch((err) =>
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
-  }, [token]);
+  }, [token, canManage]);
+
+  const setTab = (next: "fichas" | "recetas") => {
+    const nextParams = new URLSearchParams(params);
+    if (next === "fichas") nextParams.delete("tab");
+    else nextParams.set("tab", "recetas");
+    setParams(nextParams, { replace: true });
+  };
 
   const resetForm = () => {
     setEditingId(null);
     setName("");
+    setPresentation("");
+    setCategoryId("");
     setPrice("");
     setDescription("");
     setActive(true);
-    setRecipeRows([emptyRow()]);
+    setOriginalActive(true);
+    setFormStatusReason("");
+    setShowForm(false);
   };
 
   const startEdit = (dish: Dish) => {
     setError("");
     setOk("");
+    setShowForm(true);
     setEditingId(dish.id);
     setName(dish.name);
+    setPresentation(dish.presentation || "");
+    setCategoryId(String(dish.category_id || dish.category?.id || ""));
     setPrice(String(Number(dish.price)));
     setDescription(dish.description || "");
     setActive(dish.is_active);
-    setRecipeRows(rowsFromDish(dish));
-  };
-
-  const updateRow = (index: number, patch: Partial<RecipeRow>) => {
-    setRecipeRows((rows) =>
-      rows.map((row, i) => (i === index ? { ...row, ...patch } : row))
-    );
+    setOriginalActive(dish.is_active);
+    setFormStatusReason("");
   };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !canManage) return;
     setError("");
     setOk("");
 
-    const filled = recipeRows.filter((row) => row.ingredient_id || row.quantity);
-    const incomplete = filled.some((row) => !row.ingredient_id || !row.quantity);
-    if (incomplete) {
-      setError("Cada línea de la receta necesita ingrediente y cantidad");
+    if (!name.trim()) {
+      setError("El nombre es obligatorio");
+      return;
+    }
+    if (!categoryId) {
+      setError("Asigna el plato a una categoría existente");
+      return;
+    }
+    const nextPrice = Number(price);
+    if (!nextPrice || nextPrice <= 0) {
+      setError("El precio debe ser mayor que cero");
       return;
     }
 
-    const items = filled.map((row) => ({
-      ingredient_id: Number(row.ingredient_id),
-      quantity: Number(row.quantity),
-    }));
-    const ids = items.map((item) => item.ingredient_id);
-    if (new Set(ids).size !== ids.length) {
-      setError("No se puede repetir un ingrediente en la misma receta");
+    if (editingId && active !== originalActive && formStatusReason.trim().length < 3) {
+      setError("Indica el motivo del cambio de estado");
       return;
     }
 
@@ -100,28 +119,31 @@ export function DishesPage() {
       if (editingId) {
         await catalogApi.updateDish(token, editingId, {
           name: name.trim(),
-          price: Number(price),
+          presentation: presentation.trim(),
+          category_id: Number(categoryId),
+          price: nextPrice,
           description: description.trim(),
           is_active: active,
+          ...(active !== originalActive
+            ? { status_reason: formStatusReason.trim() }
+            : {}),
         });
-        await catalogApi.setRecipe(token, editingId, items);
-        setOk("Plato y receta actualizados");
+        setOk("Plato actualizado");
+        setOriginalActive(active);
+        setFormStatusReason("");
+        await load();
       } else {
         const created = await catalogApi.createDish(token, {
           name: name.trim(),
-          price: Number(price),
+          presentation: presentation.trim(),
+          category_id: Number(categoryId),
+          price: nextPrice,
           description: description.trim(),
+          is_active: active,
         });
-        if (!active) {
-          await catalogApi.updateDish(token, created.id, { is_active: false });
-        }
-        if (items.length) {
-          await catalogApi.setRecipe(token, created.id, items);
-        }
-        setOk("Plato registrado");
-        resetForm();
+        navigate(`/dishes/${created.id}/receta`);
+        return;
       }
-      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar");
     } finally {
@@ -129,198 +151,307 @@ export function DishesPage() {
     }
   };
 
-  const toggleDish = async (dish: Dish) => {
-    if (!token) return;
+  const openStatusDialog = (dish: Dish) => {
     setError("");
     setOk("");
+    setStatusTarget(dish);
+    setStatusReason("");
+  };
+
+  const confirmStatusChange = async () => {
+    if (!token || !statusTarget) return;
+    const reason = statusReason.trim();
+    if (reason.length < 3) {
+      setError("Indica el motivo del cambio de estado");
+      return;
+    }
+    setSavingStatus(true);
     try {
-      await catalogApi.updateDish(token, dish.id, { is_active: !dish.is_active });
-      if (editingId === dish.id) setActive(!dish.is_active);
-      setOk(dish.is_active ? "Plato desactivado" : "Plato activado");
+      const is_active = statusTarget.is_active === false;
+      await catalogApi.updateDish(token, statusTarget.id, {
+        is_active,
+        status_reason: reason,
+      });
+      if (editingId === statusTarget.id) {
+        setActive(is_active);
+        setOriginalActive(is_active);
+        setFormStatusReason("");
+      }
+      setOk(
+        is_active
+          ? `${dishLabel(statusTarget)} volvió a la carta`
+          : `${dishLabel(statusTarget)} quedó fuera de la carta`
+      );
+      setStatusTarget(null);
+      setStatusReason("");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar");
+    } finally {
+      setSavingStatus(false);
     }
   };
 
-  const ingredientChoices = (selectedId: string) =>
-    ingredients.filter(
-      (item) => item.is_active || String(item.id) === selectedId
+  const visibleCategories = useMemo(
+    () => categories.filter((item) => item.is_active),
+    [categories]
+  );
+
+  const visible = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return dishes.filter((dish) => {
+      if (!canManage && dish.is_active === false) return false;
+      if (categoryTab !== "all" && String(dish.category_id) !== categoryTab) {
+        return false;
+      }
+      if (!text) return true;
+      return (
+        dish.name.toLowerCase().includes(text) ||
+        (dish.presentation || "").toLowerCase().includes(text) ||
+        (dish.category?.name || "").toLowerCase().includes(text) ||
+        (dish.description || "").toLowerCase().includes(text)
+      );
+    });
+  }, [dishes, query, canManage, categoryTab]);
+
+  const activeCount = dishes.filter((dish) => dish.is_active).length;
+  const inactiveCount = dishes.filter((dish) => dish.is_active === false).length;
+  const withRecipe = dishes.filter(hasRecipe).length;
+  const pendingRecipe = dishes.length - withRecipe;
+
+  if (tab === "recetas" && canManage) {
+    return (
+      <div>
+        <CatalogHeader
+          canManage={canManage}
+          tab={tab}
+          onTab={setTab}
+        />
+        <DishRecipePage embedded />
+      </div>
     );
+  }
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1>Carta</h1>
-          <p>Edita cada plato y asocia o cambia los ingredientes de su receta.</p>
-        </div>
-        {editingId ? (
-          <button type="button" className="btn btn-ghost" onClick={resetForm}>
-            Nuevo plato
-          </button>
-        ) : null}
-      </div>
+      <CatalogHeader canManage={canManage} tab={tab} onTab={setTab} />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {ok ? <div className="alert alert-ok">{ok}</div> : null}
 
-      <section className="panel">
-        <h2>{editingId ? "Editar plato" : "Nuevo plato"}</h2>
-        <form className="form-grid" onSubmit={save}>
-          <div className="form-row">
-            <label>
-              Nombre
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Precio (S/)
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                required
-              />
-            </label>
-          </div>
-          <label>
-            Descripción
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </label>
-
-          <div className="status-row">
-            <div>
-              <strong>Receta</strong>
-              <p>Ingredientes que se descuentan del inventario al confirmar el pedido.</p>
-            </div>
-          </div>
-
-          {recipeRows.map((row, index) => (
-            <div className="recipe-row" key={index}>
-              <label>
-                Ingrediente
-                <select
-                  value={row.ingredient_id}
-                  onChange={(e) =>
-                    updateRow(index, { ingredient_id: e.target.value })
-                  }
-                >
-                  <option value="">Seleccionar...</option>
-                  {ingredientChoices(row.ingredient_id).map((ing) => (
-                    <option key={ing.id} value={ing.id}>
-                      {ing.name} ({ing.unit})
-                      {ing.is_active ? "" : " · inactivo"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Cantidad
-                <input
-                  type="number"
-                  min="0.001"
-                  step="0.001"
-                  value={row.quantity}
-                  onChange={(e) => updateRow(index, { quantity: e.target.value })}
-                  placeholder="0.000"
-                />
-              </label>
+      {canManage ? (
+        <div className="catalog-cards">
+          <article className="panel catalog-card">
+            <p className="catalog-card-kicker">Platos y Precios de Venta</p>
+            <h2>
+              {activeCount} Platos Activos / {inactiveCount} Inactivos
+            </h2>
+            <p>Registra, edita y activa platos visibles para los meseros.</p>
+            <div className="actions">
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() =>
-                  setRecipeRows((rows) =>
-                    rows.length === 1 ? [emptyRow()] : rows.filter((_, i) => i !== index)
-                  )
-                }
+                onClick={() => setShowForm(false)}
               >
-                Quitar
+                Ver lista
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(true);
+                }}
+              >
+                Gestionar Platos
               </button>
             </div>
-          ))}
+          </article>
+          <article className="panel catalog-card">
+            <p className="catalog-card-kicker">Asociación de Recetas e Ingredientes</p>
+            <h2>
+              {withRecipe} Recetas Configuradas / {pendingRecipe} Pendientes
+            </h2>
+            <p>Configura recetas para el control automático de stock.</p>
+            <div className="actions">
+              <Link className="btn btn-ghost" to="/dishes/recetas">
+                Ver lista
+              </Link>
+              <Link className="btn btn-primary" to="/dishes/recetas">
+                Gestionar Recetas
+              </Link>
+            </div>
+          </article>
+        </div>
+      ) : null}
 
-          <div className="actions">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setRecipeRows((rows) => [...rows, emptyRow()])}
-            >
-              + Ingrediente
-            </button>
-          </div>
-
-          <label className={`switch${active ? " on" : ""}`}>
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-            />
-            <span className="switch-ui" />
-            <span className="switch-label">
-              {active ? "Activo en la carta" : "Fuera de la carta"}
-            </span>
-          </label>
-
-          <div className="form-footer">
-            {editingId ? (
+      {showForm && canManage ? (
+        <section className="panel">
+          <h2>{editingId ? "Editar plato" : "Registro de Plato"}</h2>
+          <form className="form-grid" onSubmit={save}>
+            <div className="form-row">
+              <label>
+                Nombre del plato
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej. Parrillada Mixta"
+                  required
+                />
+              </label>
+              <label>
+                Presentación
+                <input
+                  value={presentation}
+                  onChange={(e) => setPresentation(e.target.value)}
+                  placeholder="Ej. Porción, 300 g, Botella"
+                />
+              </label>
+            </div>
+            <div className="form-row">
+              <label>
+                Categoría
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona una categoría</option>
+                  {categories
+                    .filter((item) => item.is_active || String(item.id) === categoryId)
+                    .map((item) => (
+                      <option key={item.id} value={item.id} disabled={!item.is_active}>
+                        {item.name}
+                        {item.is_active ? "" : " (quitada)"}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Precio (S/)
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Mayor a 0.00"
+                  required
+                />
+              </label>
+            </div>
+            <label>
+              Descripción
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+            <div className="status-row">
+              <div>
+                <strong>Estado</strong>
+                <p>Activo: el mesero lo ve. Inactivo: queda fuera de la carta.</p>
+              </div>
+              <label className={`switch${active ? " on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={(e) => setActive(e.target.checked)}
+                />
+                <span className="switch-ui" />
+                <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
+              </label>
+            </div>
+            {editingId && active !== originalActive ? (
+              <label className="field">
+                <span>Motivo del cambio de estado</span>
+                <textarea
+                  value={formStatusReason}
+                  onChange={(e) => setFormStatusReason(e.target.value)}
+                  rows={3}
+                  required
+                />
+              </label>
+            ) : null}
+            <div className="form-footer">
               <button type="button" className="btn btn-ghost" onClick={resetForm}>
                 Cancelar
               </button>
-            ) : null}
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving
-                ? "Guardando..."
-                : editingId
-                  ? "Guardar cambios"
-                  : "Guardar plato"}
-            </button>
-          </div>
-        </form>
-      </section>
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving
+                  ? "Guardando..."
+                  : editingId
+                    ? "Guardar cambios"
+                    : "Guardar Plato"}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
+      <div className="category-tabs" role="tablist" aria-label="Categorías de la carta">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={categoryTab === "all"}
+          className={`category-tab${categoryTab === "all" ? " active" : ""}`}
+          onClick={() => setCategoryTab("all")}
+        >
+          Todas
+        </button>
+        {visibleCategories.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={categoryTab === String(item.id)}
+            className={`category-tab${categoryTab === String(item.id) ? " active" : ""}`}
+            onClick={() => setCategoryTab(String(item.id))}
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
 
       <section className="panel">
-        <h2>Catálogo</h2>
+        <div className="list-head">
+          <div>
+            <h2>
+              {categoryTab === "all"
+                ? "Últimos platos creados"
+                : visibleCategories.find((item) => String(item.id) === categoryTab)?.name ||
+                  "Platos"}
+            </h2>
+            <p>
+              {visible.length} {visible.length === 1 ? "plato" : "platos"}
+            </p>
+          </div>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar plato..."
+            aria-label="Buscar plato"
+          />
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Plato</th>
                 <th>Precio</th>
-                <th>Receta</th>
                 <th>Estado</th>
-                <th></th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody>
-              {dishes.map((dish) => (
+              {visible.map((dish) => (
                 <tr key={dish.id}>
                   <td>
-                    <strong>{dish.name}</strong>
-                    {dish.description ? (
-                      <div className="hint">{dish.description}</div>
-                    ) : null}
+                    <strong>{dishLabel(dish)}</strong>
+                    <div className="hint">{dish.category?.name || "Sin categoría"}</div>
                   </td>
                   <td>S/ {Number(dish.price).toFixed(2)}</td>
-                  <td>
-                    {(dish.recipe_items || []).length
-                      ? (dish.recipe_items || [])
-                          .map(
-                            (item) =>
-                              `${item.ingredient?.name || item.ingredient_id} (${Number(item.quantity)} ${item.ingredient?.unit || ""})`
-                          )
-                          .join(", ")
-                      : "Sin receta"}
-                  </td>
                   <td>
                     <span
                       className={`badge ${dish.is_active ? "badge-ok" : "badge-danger"}`}
@@ -329,32 +460,159 @@ export function DishesPage() {
                     </span>
                   </td>
                   <td>
-                    <div className="actions">
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => startEdit(dish)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => toggleDish(dish)}
-                      >
-                        {dish.is_active ? "Desactivar" : "Activar"}
-                      </button>
-                    </div>
+                    {canManage ? (
+                      <div className="actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => startEdit(dish)}
+                        >
+                          Editar
+                        </button>
+                        <Link
+                          className="btn btn-ghost"
+                          to={`/dishes/${dish.id}/receta`}
+                        >
+                          {hasRecipe(dish) ? "Editar receta" : "Crear receta"}
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => openStatusDialog(dish)}
+                        >
+                          Estado
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="hint">
+                        {hasRecipe(dish) ? "Con receta" : "Sin receta"}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {dishes.length === 0 ? (
-            <div className="empty">Aún no hay platos en la carta</div>
+          {visible.length === 0 ? (
+            <div className="empty">No hay platos en esta categoría</div>
+          ) : null}
+        </div>
+        <div className="list-foot">
+          <span>
+            Mostrando {visible.length} de {canManage ? dishes.length : visible.length}{" "}
+            {dishes.length === 1 ? "plato" : "platos"}
+          </span>
+          {canManage ? (
+            <span>
+              {pendingRecipe === 1
+                ? "1 receta por configurar"
+                : `${pendingRecipe} recetas por configurar`}
+            </span>
           ) : null}
         </div>
       </section>
+
+      {statusTarget ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={() => setStatusTarget(null)}
+        >
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-labelledby="dish-status-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="dish-status-dialog-title">
+              {statusTarget.is_active === false
+                ? `Reactivar ${dishLabel(statusTarget)}`
+                : `Sacar ${dishLabel(statusTarget)} de la carta`}
+            </h2>
+            <p className="page-lead">
+              El motivo queda guardado con la fecha y quién hizo el cambio.
+            </p>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <label className="field">
+              <span>Motivo</span>
+              <textarea
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+                rows={3}
+                required
+              />
+            </label>
+            <div className="form-footer">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setStatusTarget(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={savingStatus}
+                onClick={confirmStatusChange}
+              >
+                {savingStatus ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CatalogHeader({
+  canManage,
+  tab,
+  onTab,
+}: {
+  canManage: boolean;
+  tab: "fichas" | "recetas";
+  onTab: (tab: "fichas" | "recetas") => void;
+}) {
+  return (
+    <div className="page-head catalog-head">
+      <div>
+        <p className="crumb">Administración › Carta</p>
+        <h1>Gestión de Carta y Menú</h1>
+        <p>
+          {canManage
+            ? "Administra los platos del restaurante y configura las recetas de cocina para el control automático de stock."
+            : "Carta activa por categoría, con precios de venta."}
+        </p>
+        {canManage ? (
+          <div className="page-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "fichas"}
+              className={`page-tab${tab === "fichas" ? " active" : ""}`}
+              onClick={() => onTab("fichas")}
+            >
+              Fichas
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "recetas"}
+              className={`page-tab${tab === "recetas" ? " active" : ""}`}
+              onClick={() => onTab("recetas")}
+            >
+              Recetas
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {canManage ? (
+        <Link className="btn btn-ghost" to="/categories">
+          Categorías
+        </Link>
+      ) : null}
     </div>
   );
 }

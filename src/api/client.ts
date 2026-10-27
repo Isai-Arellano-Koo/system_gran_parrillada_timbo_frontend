@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// En local apunta al backend. En Railway se cambia con VITE_API_URL
 
 type RequestOptions = {
   method?: string;
@@ -8,10 +9,16 @@ type RequestOptions = {
 
 export class ApiError extends Error {
   status: number;
+  payload: Record<string, unknown>;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    payload: Record<string, unknown> = {}
+  ) {
     super(message);
     this.status = status;
+    this.payload = payload;
   }
 }
 
@@ -38,7 +45,8 @@ export async function apiRequest<T>(
   if (!response.ok) {
     throw new ApiError(
       data.message || "Error en la solicitud",
-      response.status
+      response.status,
+      data as Record<string, unknown>
     );
   }
 

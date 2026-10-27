@@ -10,6 +10,17 @@ export type User = {
   email_verified?: boolean;
 };
 
+export type UserStatusChange = {
+  id: number;
+  user_id: number;
+  previous_is_active: boolean;
+  next_is_active: boolean;
+  reason: string;
+  created_at?: string;
+  user?: Pick<User, "id" | "name" | "username" | "email" | "role">;
+  changed_by_user?: Pick<User, "id" | "name" | "username" | "email">;
+};
+
 export type AuthResponse = {
   accessToken: string;
   user: User;
@@ -41,14 +52,61 @@ export type RecipeItem = {
   ingredient?: Ingredient;
 };
 
-export type Dish = {
+export type CategoryDish = {
   id: number;
   name: string;
+  presentation?: string;
+  is_active: boolean;
+};
+
+export type Category = {
+  id: number;
+  name: string;
+  is_active: boolean;
+  sort_order?: number;
+  dishes?: CategoryDish[];
+};
+
+export type Dish = {
+  id: number;
+  category_id: number;
+  name: string;
+  presentation?: string;
   price: number | string;
   description?: string | null;
   is_active: boolean;
+  category_disabled?: boolean;
+  category?: Category;
   recipe_items?: RecipeItem[];
 };
+
+export function dishLabel(dish: {
+  name: string;
+  presentation?: string | null;
+}) {
+  const presentation = (dish.presentation || "").trim();
+  return presentation ? `${dish.name} — ${presentation}` : dish.name;
+}
+
+export function orderCodeLabel(order: {
+  id?: number;
+  code: string;
+  table_id: number;
+  table?: { number?: number } | null;
+  created_at?: string;
+}) {
+  if (/^M\d{2}-\d{4}-\d+$/i.test(order.code)) return order.code;
+  const table = String(order.table?.number ?? order.table_id).padStart(2, "0");
+  const date = order.created_at ? new Date(order.created_at) : null;
+  const ddmm =
+    date && !Number.isNaN(date.getTime())
+      ? `${String(date.getDate()).padStart(2, "0")}${String(
+          date.getMonth() + 1
+        ).padStart(2, "0")}`
+      : "";
+  const tail = order.code.match(/(\d{2,3})$/)?.[1] || String(order.id || "");
+  return ddmm ? `M${table}-${ddmm}-${tail}` : `M${table}-${tail}`;
+}
 
 export type TableItem = {
   id: number;
@@ -64,14 +122,25 @@ export type OrderDetail = {
   quantity: number;
   unit_price: number | string;
   observation?: string | null;
+  sent_to_kitchen?: boolean;
+  kitchen_status?: "pendiente" | "en_preparacion" | "listo" | "entregado";
   dish?: Dish;
 };
+
+export function kitchenStatusLabel(status?: string) {
+  if (status === "pendiente") return "Pendiente";
+  if (status === "en_preparacion") return "En preparación";
+  if (status === "listo") return "Listo para servir";
+  if (status === "entregado") return "En mesa";
+  return status || "";
+}
 
 export type KitchenTicket = {
   id: number;
   order_id: number;
   status: "pendiente" | "en_preparacion" | "listo" | "entregado";
   status_changed_at?: string | null;
+  created_at?: string;
   order?: Order;
 };
 
@@ -80,10 +149,15 @@ export type Order = {
   code: string;
   table_id: number;
   waiter_id: number;
-  status: "en_edicion" | "confirmado" | "cancelado";
+  status: "en_edicion" | "confirmado" | "cerrado" | "cancelado";
   total: number | string;
   cancel_reason?: string | null;
+  paid?: boolean;
+  amount_paid?: number | string;
+  paid_at?: string | null;
   confirmed_at?: string | null;
+  closed_at?: string | null;
+  created_at?: string;
   table?: TableItem;
   waiter?: User;
   details?: OrderDetail[];
