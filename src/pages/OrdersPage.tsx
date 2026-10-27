@@ -72,6 +72,10 @@ function lineTotal(detail: OrderDetail) {
   return Number(detail.unit_price) * Number(detail.quantity);
 }
 
+function isSentToKitchen(detail: OrderDetail) {
+  return detail.sent_to_kitchen === true;
+}
+
 export function OrdersPage() {
   const { token, user } = useAuth();
   const [tables, setTables] = useState<TableItem[]>([]);
@@ -93,7 +97,8 @@ export function OrdersPage() {
   const canEditItems =
     activeOrder?.status === "en_edicion" || activeOrder?.status === "confirmado";
   const details = activeOrder?.details || [];
-  const unsent = details.filter((detail) => !detail.sent_to_kitchen);
+  const sent = details.filter(isSentToKitchen);
+  const unsent = details.filter((detail) => !isSentToKitchen(detail));
   const itemCount = details.reduce((sum, detail) => sum + Number(detail.quantity), 0);
 
   const openByTable = useMemo(() => {
@@ -220,7 +225,7 @@ export function OrdersPage() {
         (d) =>
           d.dish_id === dish.id &&
           !(d.observation || "").trim() &&
-          !d.sent_to_kitchen
+          !isSentToKitchen(d)
       );
       const order = same
         ? await ordersApi.updateDetail(token, activeOrder.id, same.id, {
@@ -240,7 +245,7 @@ export function OrdersPage() {
 
   const changeQty = async (detail: OrderDetail, quantity: number) => {
     if (!token || !activeOrder || !canEditItems) return;
-    if (detail.sent_to_kitchen) return;
+    if (isSentToKitchen(detail)) return;
     setBusy(true);
     try {
       const order =
@@ -363,6 +368,86 @@ export function OrdersPage() {
     const name = detail.dish ? dishLabel(detail.dish) : "";
     return shortages.filter(
       (s) => s.dishes.includes(name) || s.dishes.includes(detail.dish?.name || "")
+    );
+  };
+
+  const renderLine = (detail: OrderDetail) => {
+    const alerts = shortageFor(detail);
+    const sentLine = isSentToKitchen(detail);
+    const canChangeQty = canEditItems && !sentLine;
+    return (
+      <article
+        key={detail.id}
+        className={`pos-line ${alerts.length ? "warn" : ""} ${
+          canChangeQty && !editing ? "pending" : ""
+        }`}
+      >
+        <div className="pos-line-top">
+          <div>
+            <strong>{detail.dish?.name || `Plato ${detail.dish_id}`}</strong>
+            {detail.dish?.presentation ? (
+              <p className="muted">{detail.dish.presentation}</p>
+            ) : null}
+            <p className="muted">{money(detail.unit_price)} c/u</p>
+          </div>
+          <strong className="pos-line-sum">{money(lineTotal(detail))}</strong>
+        </div>
+        {canChangeQty ? (
+          <div className="pos-line-actions">
+            <div className="pos-qty">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => changeQty(detail, detail.quantity - 1)}
+              >
+                −
+              </button>
+              <span>{detail.quantity}</span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => changeQty(detail, detail.quantity + 1)}
+              >
+                +
+              </button>
+            </div>
+            <button
+              type="button"
+              className="pos-remove"
+              disabled={busy}
+              onClick={() => changeQty(detail, 0)}
+            >
+              Eliminar
+            </button>
+          </div>
+        ) : (
+          <p className="muted">Cantidad: {detail.quantity}</p>
+        )}
+        {canChangeQty ? (
+          <input
+            className="pos-note"
+            value={notes[detail.id] ?? ""}
+            placeholder="Nota: término, sin salsa…"
+            onChange={(e) =>
+              setNotes((prev) => ({
+                ...prev,
+                [detail.id]: e.target.value,
+              }))
+            }
+            onBlur={() => saveNote(detail)}
+          />
+        ) : detail.observation ? (
+          <p className="muted">Nota: {detail.observation}</p>
+        ) : null}
+        {canChangeQty && !editing ? (
+          <p className="pos-stock-warn">Por enviar a cocina</p>
+        ) : null}
+        {alerts.map((alert) => (
+          <p key={alert.name} className="pos-stock-warn">
+            Stock insuficiente de {alert.name} (solo quedan {alert.available})
+          </p>
+        ))}
+      </article>
     );
   };
 
@@ -570,91 +655,30 @@ export function OrdersPage() {
           <div className="pos-ticket-lines">
             {!details.length ? (
               <p className="muted">Aún no hay platos en el ticket.</p>
+            ) : activeOrder.status === "confirmado" ? (
+              <>
+                <section className="pos-ticket-group">
+                  <h3>Enviado a cocina</h3>
+                  {sent.length ? (
+                    sent.map(renderLine)
+                  ) : (
+                    <p className="muted">Todavía no hay platos en cocina.</p>
+                  )}
+                </section>
+                <section className="pos-ticket-group">
+                  <h3>Extras</h3>
+                  {unsent.length ? (
+                    unsent.map(renderLine)
+                  ) : (
+                    <p className="muted">
+                      Si piden más, agrégalos desde la carta. Aparecerán aquí
+                      hasta enviarlos a cocina.
+                    </p>
+                  )}
+                </section>
+              </>
             ) : (
-              details.map((detail) => {
-                const alerts = shortageFor(detail);
-                const canChangeQty = canEditItems && !detail.sent_to_kitchen;
-                return (
-                  <article
-                    key={detail.id}
-                    className={`pos-line ${alerts.length ? "warn" : ""} ${
-                      canChangeQty && !editing ? "pending" : ""
-                    }`}
-                  >
-                    <div className="pos-line-top">
-                      <div>
-                        <strong>
-                          {detail.dish?.name || `Plato ${detail.dish_id}`}
-                        </strong>
-                        {detail.dish?.presentation ? (
-                          <p className="muted">{detail.dish.presentation}</p>
-                        ) : null}
-                        <p className="muted">{money(detail.unit_price)} c/u</p>
-                      </div>
-                      <strong className="pos-line-sum">{money(lineTotal(detail))}</strong>
-                    </div>
-                    {canChangeQty ? (
-                      <div className="pos-line-actions">
-                        <div className="pos-qty">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => changeQty(detail, detail.quantity - 1)}
-                          >
-                            −
-                          </button>
-                          <span>{detail.quantity}</span>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => changeQty(detail, detail.quantity + 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          className="pos-remove"
-                          disabled={busy}
-                          onClick={() => changeQty(detail, 0)}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="muted">
-                        Cantidad: {detail.quantity}
-                        {detail.sent_to_kitchen ? " · En cocina / mesa" : ""}
-                      </p>
-                    )}
-                    {canChangeQty ? (
-                      <input
-                        className="pos-note"
-                        value={notes[detail.id] ?? ""}
-                        placeholder="Nota: término, sin salsa…"
-                        onChange={(e) =>
-                          setNotes((prev) => ({
-                            ...prev,
-                            [detail.id]: e.target.value,
-                          }))
-                        }
-                        onBlur={() => saveNote(detail)}
-                      />
-                    ) : detail.observation ? (
-                      <p className="muted">Nota: {detail.observation}</p>
-                    ) : null}
-                    {canChangeQty && !editing ? (
-                      <p className="pos-stock-warn">Por enviar a cocina</p>
-                    ) : null}
-                    {alerts.map((alert) => (
-                      <p key={alert.name} className="pos-stock-warn">
-                        Stock insuficiente de {alert.name} (solo quedan{" "}
-                        {alert.available})
-                      </p>
-                    ))}
-                  </article>
-                );
-              })
+              details.map(renderLine)
             )}
           </div>
 
