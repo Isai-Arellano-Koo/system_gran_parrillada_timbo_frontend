@@ -101,6 +101,7 @@ export function InventoryPage() {
       return matchesQuery(
         moveQuery,
         item.ingredient?.name,
+        item.ingredient?.unit,
         item.ingredient_id,
         item.type,
         typeLabel(item.type),
@@ -346,7 +347,9 @@ export function InventoryPage() {
                   <td>
                     <span className="badge badge-edit">{typeLabel(m.type)}</span>
                   </td>
-                  <td>{Number(m.quantity)}</td>
+                  <td>
+                    {Number(m.quantity)} {m.ingredient?.unit || ""}
+                  </td>
                   <td>{m.reason || "—"}</td>
                   <td>{m.user?.name || "—"}</td>
                 </tr>
