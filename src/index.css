@@ -709,8 +709,9 @@ textarea:focus {
   margin: -0.25rem 0 0.85rem;
 }
 
-.filter-bar select {
-  min-width: min(100%, 180px);
+.filter-bar select,
+.filter-bar input[type="date"] {
+  min-width: min(100%, 160px);
 }
 
 .list-head p,

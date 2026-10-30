@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { catalogApi, inventoryApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Ingredient, InventoryMovement, StockAlert } from "../types";
+import { orderCodeLabel } from "../types";
 import { matchesQuery } from "../helpers/search";
 
 const MOVE_TYPES = [
@@ -24,10 +25,22 @@ function startOfToday() {
   return date;
 }
 
-function daysAgo(days: number) {
-  const date = startOfToday();
-  date.setDate(date.getDate() - days);
-  return date;
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function movementOrderLabel(item: InventoryMovement) {
+  if (item.type !== "salida_venta") return "—";
+  if (item.order?.code) {
+    const mesa = item.order.table?.number ?? item.order.table_id;
+    return mesa
+      ? `${orderCodeLabel(item.order)} · Mesa ${String(mesa).padStart(2, "0")}`
+      : orderCodeLabel(item.order);
+  }
+  return item.order_id ? `Pedido #${item.order_id}` : "—";
 }
 
 export function InventoryPage() {
@@ -44,7 +57,10 @@ export function InventoryPage() {
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "empty">("all");
   const [moveQuery, setMoveQuery] = useState("");
   const [moveType, setMoveType] = useState("");
-  const [movePeriod, setMovePeriod] = useState<"all" | "today" | "week">("all");
+  const [moveIngredientId, setMoveIngredientId] = useState("");
+  const [moveUserId, setMoveUserId] = useState("");
+  const [moveFrom, setMoveFrom] = useState("");
+  const [moveTo, setMoveTo] = useState("");
 
   const load = async () => {
     if (!token) return;
@@ -82,22 +98,27 @@ export function InventoryPage() {
     });
   }, [ingredients, stockQuery, stockFilter]);
 
+  const moveUsers = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const item of movements) {
+      if (item.user?.id) map.set(item.user.id, item.user.name);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
+  }, [movements]);
+
   const visibleMoves = useMemo(() => {
-    const from =
-      movePeriod === "today"
-        ? startOfToday()
-        : movePeriod === "week"
-          ? daysAgo(7)
-          : null;
+    const from = moveFrom ? new Date(`${moveFrom}T00:00:00`) : null;
+    const to = moveTo ? new Date(`${moveTo}T23:59:59.999`) : null;
     return movements.filter((item) => {
       if (moveType && item.type !== moveType) return false;
-      if (from) {
-        const created = item.created_at ? new Date(item.created_at) : null;
-        if (!created || created < from) return false;
+      if (moveIngredientId && String(item.ingredient_id) !== moveIngredientId) {
+        return false;
       }
-      const when = item.created_at
-        ? new Date(item.created_at).toLocaleString()
-        : "";
+      if (moveUserId && String(item.user?.id || "") !== moveUserId) return false;
+      const created = item.created_at ? new Date(item.created_at) : null;
+      if (from && (!created || created < from)) return false;
+      if (to && (!created || created > to)) return false;
+      const when = created ? created.toLocaleString() : "";
       return matchesQuery(
         moveQuery,
         item.ingredient?.name,
@@ -108,10 +129,19 @@ export function InventoryPage() {
         Number(item.quantity),
         item.reason,
         item.user?.name,
+        movementOrderLabel(item),
         when
       );
     });
-  }, [movements, moveQuery, moveType, movePeriod]);
+  }, [
+    movements,
+    moveQuery,
+    moveType,
+    moveIngredientId,
+    moveUserId,
+    moveFrom,
+    moveTo,
+  ]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -295,11 +325,23 @@ export function InventoryPage() {
           <input
             value={moveQuery}
             onChange={(e) => setMoveQuery(e.target.value)}
-            placeholder="Buscar insumo, tipo, motivo, usuario…"
+            placeholder="Buscar insumo, tipo, motivo, usuario, pedido…"
             aria-label="Buscar movimiento"
           />
         </div>
         <div className="filter-bar">
+          <select
+            value={moveIngredientId}
+            onChange={(e) => setMoveIngredientId(e.target.value)}
+            aria-label="Filtrar por ingrediente"
+          >
+            <option value="">Todos los ingredientes</option>
+            {ingredients.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
           <select
             value={moveType}
             onChange={(e) => setMoveType(e.target.value)}
@@ -312,16 +354,40 @@ export function InventoryPage() {
             ))}
           </select>
           <select
-            value={movePeriod}
-            onChange={(e) =>
-              setMovePeriod(e.target.value as "all" | "today" | "week")
-            }
-            aria-label="Filtrar por fecha"
+            value={moveUserId}
+            onChange={(e) => setMoveUserId(e.target.value)}
+            aria-label="Filtrar por usuario"
           >
-            <option value="all">Todo el historial</option>
-            <option value="today">Hoy</option>
-            <option value="week">Últimos 7 días</option>
+            <option value="">Todos los usuarios</option>
+            {moveUsers.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
           </select>
+          <input
+            type="date"
+            value={moveFrom}
+            onChange={(e) => setMoveFrom(e.target.value)}
+            aria-label="Desde"
+          />
+          <input
+            type="date"
+            value={moveTo}
+            onChange={(e) => setMoveTo(e.target.value)}
+            aria-label="Hasta"
+          />
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const today = toDateInput(startOfToday());
+              setMoveFrom(today);
+              setMoveTo(today);
+            }}
+          >
+            Hoy
+          </button>
         </div>
         <div className="table-wrap">
           <table>
@@ -331,6 +397,7 @@ export function InventoryPage() {
                 <th>Ingrediente</th>
                 <th>Tipo</th>
                 <th>Cantidad</th>
+                <th>Pedido</th>
                 <th>Descripción</th>
                 <th>Usuario</th>
               </tr>
@@ -350,6 +417,7 @@ export function InventoryPage() {
                   <td>
                     {Number(m.quantity)} {m.ingredient?.unit || ""}
                   </td>
+                  <td>{movementOrderLabel(m)}</td>
                   <td>{m.reason || "—"}</td>
                   <td>{m.user?.name || "—"}</td>
                 </tr>

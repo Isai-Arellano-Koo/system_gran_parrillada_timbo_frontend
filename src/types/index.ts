@@ -174,6 +174,12 @@ export type InventoryMovement = {
   created_at?: string;
   ingredient?: Ingredient;
   user?: User;
+  order?: {
+    id: number;
+    code: string;
+    table_id: number;
+    table?: { id: number; number: number };
+  } | null;
 };
 
 export type StockAlert = {
