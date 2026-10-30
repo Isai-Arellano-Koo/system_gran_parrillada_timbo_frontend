@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import type { Category, Dish } from "../types";
 import { dishLabel } from "../types";
 import { DishRecipePage } from "./DishRecipePage";
+import { matchesQuery } from "../helpers/search";
 
 function hasRecipe(dish: Dish) {
   return (dish.recipe_items || []).length > 0;
@@ -205,11 +206,17 @@ export function DishesPage() {
         return false;
       }
       if (!text) return true;
-      return (
-        dish.name.toLowerCase().includes(text) ||
-        (dish.presentation || "").toLowerCase().includes(text) ||
-        (dish.category?.name || "").toLowerCase().includes(text) ||
-        (dish.description || "").toLowerCase().includes(text)
+      return matchesQuery(
+        text,
+        dish.name,
+        dish.presentation,
+        dish.category?.name,
+        dish.description,
+        Number(dish.price),
+        `S/ ${Number(dish.price).toFixed(2)}`,
+        dish.is_active ? "activo" : "inactivo",
+        hasRecipe(dish) ? "con receta" : "sin receta",
+        ...(dish.recipe_items || []).map((item) => item.ingredient?.name)
       );
     });
   }, [dishes, query, canManage, categoryTab]);
@@ -430,7 +437,7 @@ export function DishesPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar plato..."
+            placeholder="Buscar por plato, categoría, precio, receta…"
             aria-label="Buscar plato"
           />
         </div>

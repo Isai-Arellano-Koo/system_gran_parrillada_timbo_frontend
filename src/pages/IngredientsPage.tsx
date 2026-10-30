@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi } from "../api/services";
 import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import type { Ingredient } from "../types";
+import { matchesQuery } from "../helpers/search";
 
 const UNITS = ["kg", "g", "lt", "ml", "unidad"] as const;
 type Unit = (typeof UNITS)[number];
@@ -19,6 +20,7 @@ export function IngredientsPage() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = async () => {
     if (!token) return;
@@ -84,6 +86,22 @@ export function IngredientsPage() {
       setSaving(false);
     }
   };
+
+  const visible = useMemo(
+    () =>
+      items.filter((item) =>
+        matchesQuery(
+          query,
+          item.name,
+          item.unit,
+          item.is_active ? "activo" : "inactivo",
+          Number(item.stock_current),
+          Number(item.stock_minimum),
+          Number(item.stock_current) <= Number(item.stock_minimum) ? "alerta bajo mínimo" : ""
+        )
+      ),
+    [items, query]
+  );
 
   const toggleActive = async (item: Ingredient) => {
     if (!token) return;
@@ -183,7 +201,20 @@ export function IngredientsPage() {
         </section>
 
         <section className="panel">
-          <h2>Listado</h2>
+          <div className="list-head">
+            <div>
+              <h2>Listado</h2>
+              <p>
+                {visible.length} {visible.length === 1 ? "ingrediente" : "ingredientes"}
+              </p>
+            </div>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por nombre, unidad, stock…"
+              aria-label="Buscar ingrediente"
+            />
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -196,7 +227,7 @@ export function IngredientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {visible.map((item) => {
                   const low =
                     item.is_active &&
                     Number(item.stock_current) <= Number(item.stock_minimum);
@@ -238,8 +269,10 @@ export function IngredientsPage() {
                 })}
               </tbody>
             </table>
-            {items.length === 0 ? (
-              <div className="empty">Aún no hay ingredientes</div>
+            {!visible.length ? (
+              <div className="empty">
+                {items.length ? "Nada coincide con la búsqueda" : "Aún no hay ingredientes"}
+              </div>
             ) : null}
           </div>
         </section>

@@ -697,9 +697,20 @@ textarea:focus {
 }
 
 .list-head input {
-  max-width: 240px;
+  max-width: 320px;
   min-width: min(100%, 180px);
   flex: 1;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: -0.25rem 0 0.85rem;
+}
+
+.filter-bar select {
+  min-width: min(100%, 180px);
 }
 
 .list-head p,
@@ -1550,12 +1561,19 @@ button.badge:disabled {
 }
 
 .pos-menu-head,
-.pos-tabs {
+.pos-tabs,
+.pos-search {
   flex: none;
 }
 
 .pos-tabs {
   overflow-x: auto;
+}
+
+.pos-search {
+  width: 100%;
+  flex: none;
+  margin: 0.15rem 0 0.2rem;
 }
 
 .pos-menu-head {

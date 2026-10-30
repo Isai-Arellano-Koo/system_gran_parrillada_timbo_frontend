@@ -1,8 +1,34 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, inventoryApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Ingredient, InventoryMovement, StockAlert } from "../types";
+import { matchesQuery } from "../helpers/search";
+
+const MOVE_TYPES = [
+  { value: "", label: "Todos los tipos" },
+  { value: "entrada", label: "Entrada" },
+  { value: "salida_venta", label: "Salida por venta" },
+  { value: "devolucion", label: "Devolución" },
+  { value: "ajuste", label: "Ajuste" },
+  { value: "merma", label: "Merma" },
+] as const;
+
+function typeLabel(type: string) {
+  return MOVE_TYPES.find((item) => item.value === type)?.label || type;
+}
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function daysAgo(days: number) {
+  const date = startOfToday();
+  date.setDate(date.getDate() - days);
+  return date;
+}
 
 export function InventoryPage() {
   const { token } = useAuth();
@@ -14,6 +40,11 @@ export function InventoryPage() {
   const [reason, setReason] = useState("Compra / ingreso");
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
+  const [stockQuery, setStockQuery] = useState("");
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "empty">("all");
+  const [moveQuery, setMoveQuery] = useState("");
+  const [moveType, setMoveType] = useState("");
+  const [movePeriod, setMovePeriod] = useState<"all" | "today" | "week">("all");
 
   const load = async () => {
     if (!token) return;
@@ -33,13 +64,60 @@ export function InventoryPage() {
     );
   }, [token]);
 
+  const visibleStock = useMemo(() => {
+    return ingredients.filter((item) => {
+      const current = Number(item.stock_current);
+      const minimum = Number(item.stock_minimum);
+      if (stockFilter === "low" && current > minimum) return false;
+      if (stockFilter === "empty" && current > 0) return false;
+      return matchesQuery(
+        stockQuery,
+        item.name,
+        item.unit,
+        current,
+        minimum,
+        current <= minimum ? "alerta bajo mínimo" : "",
+        current <= 0 ? "sin stock" : ""
+      );
+    });
+  }, [ingredients, stockQuery, stockFilter]);
+
+  const visibleMoves = useMemo(() => {
+    const from =
+      movePeriod === "today"
+        ? startOfToday()
+        : movePeriod === "week"
+          ? daysAgo(7)
+          : null;
+    return movements.filter((item) => {
+      if (moveType && item.type !== moveType) return false;
+      if (from) {
+        const created = item.created_at ? new Date(item.created_at) : null;
+        if (!created || created < from) return false;
+      }
+      const when = item.created_at
+        ? new Date(item.created_at).toLocaleString()
+        : "";
+      return matchesQuery(
+        moveQuery,
+        item.ingredient?.name,
+        item.ingredient_id,
+        item.type,
+        typeLabel(item.type),
+        Number(item.quantity),
+        item.reason,
+        item.user?.name,
+        when
+      );
+    });
+  }, [movements, moveQuery, moveType, movePeriod]);
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setError("");
     setOk("");
     try {
-      // Una entrada suma stock y deja el movimiento
       await inventoryApi.createEntry(token, {
         ingredient_id: Number(ingredientId),
         quantity: Number(quantity),
@@ -143,7 +221,107 @@ export function InventoryPage() {
       </div>
 
       <section className="panel">
-        <h2>Movimientos</h2>
+        <div className="list-head">
+          <div>
+            <h2>Stock actual</h2>
+            <p>
+              {visibleStock.length} {visibleStock.length === 1 ? "insumo" : "insumos"}
+            </p>
+          </div>
+          <input
+            value={stockQuery}
+            onChange={(e) => setStockQuery(e.target.value)}
+            placeholder="Buscar insumo, unidad, cantidad…"
+            aria-label="Buscar stock"
+          />
+        </div>
+        <div className="filter-bar">
+          <select
+            value={stockFilter}
+            onChange={(e) =>
+              setStockFilter(e.target.value as "all" | "low" | "empty")
+            }
+            aria-label="Filtrar stock"
+          >
+            <option value="all">Todo el stock</option>
+            <option value="low">Bajo mínimo</option>
+            <option value="empty">Sin stock</option>
+          </select>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ingrediente</th>
+                <th>Unidad</th>
+                <th>Actual</th>
+                <th>Mínimo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleStock.map((item) => {
+                const low = Number(item.stock_current) <= Number(item.stock_minimum);
+                return (
+                  <tr key={item.id}>
+                    <td>{item.name}</td>
+                    <td>{item.unit}</td>
+                    <td>
+                      <span className={low ? "badge badge-warn" : undefined}>
+                        {Number(item.stock_current)}
+                      </span>
+                    </td>
+                    <td>{Number(item.stock_minimum)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!visibleStock.length ? (
+            <div className="empty">Nada coincide con el filtro</div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="list-head">
+          <div>
+            <h2>Movimientos</h2>
+            <p>
+              {visibleMoves.length}{" "}
+              {visibleMoves.length === 1 ? "movimiento" : "movimientos"}
+            </p>
+          </div>
+          <input
+            value={moveQuery}
+            onChange={(e) => setMoveQuery(e.target.value)}
+            placeholder="Buscar insumo, tipo, motivo, usuario…"
+            aria-label="Buscar movimiento"
+          />
+        </div>
+        <div className="filter-bar">
+          <select
+            value={moveType}
+            onChange={(e) => setMoveType(e.target.value)}
+            aria-label="Filtrar por tipo"
+          >
+            {MOVE_TYPES.map((item) => (
+              <option key={item.value || "all"} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={movePeriod}
+            onChange={(e) =>
+              setMovePeriod(e.target.value as "all" | "today" | "week")
+            }
+            aria-label="Filtrar por fecha"
+          >
+            <option value="all">Todo el historial</option>
+            <option value="today">Hoy</option>
+            <option value="week">Últimos 7 días</option>
+          </select>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -157,7 +335,7 @@ export function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {movements.map((m) => (
+              {visibleMoves.map((m) => (
                 <tr key={m.id}>
                   <td>
                     {m.created_at
@@ -166,7 +344,7 @@ export function InventoryPage() {
                   </td>
                   <td>{m.ingredient?.name || m.ingredient_id}</td>
                   <td>
-                    <span className="badge badge-edit">{m.type}</span>
+                    <span className="badge badge-edit">{typeLabel(m.type)}</span>
                   </td>
                   <td>{Number(m.quantity)}</td>
                   <td>{m.reason || "—"}</td>
@@ -175,8 +353,12 @@ export function InventoryPage() {
               ))}
             </tbody>
           </table>
-          {movements.length === 0 ? (
-            <div className="empty">Sin movimientos aún</div>
+          {!visibleMoves.length ? (
+            <div className="empty">
+              {movements.length
+                ? "Nada coincide con la búsqueda o los filtros"
+                : "Sin movimientos aún"}
+            </div>
           ) : null}
         </div>
       </section>
