@@ -7,6 +7,8 @@ import type { Category, Dish } from "../types";
 import { dishLabel } from "../types";
 import { DishRecipePage } from "./DishRecipePage";
 import { matchesQuery } from "../helpers/search";
+import { usePagedRows } from "../helpers/pagination";
+import { TablePager } from "../components/TablePager";
 
 function hasRecipe(dish: Dish) {
   return (dish.recipe_items || []).length > 0;
@@ -220,6 +222,7 @@ export function DishesPage() {
       );
     });
   }, [dishes, query, canManage, categoryTab]);
+  const paged = usePagedRows(visible, `${query}|${categoryTab}`);
 
   const activeCount = dishes.filter((dish) => dish.is_active).length;
   const inactiveCount = dishes.filter((dish) => dish.is_active === false).length;
@@ -452,7 +455,7 @@ export function DishesPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((dish) => (
+              {paged.rows.map((dish) => (
                 <tr key={dish.id}>
                   <td>
                     <strong>{dishLabel(dish)}</strong>
@@ -504,19 +507,20 @@ export function DishesPage() {
             <div className="empty">No hay platos en esta categoría</div>
           ) : null}
         </div>
-        <div className="list-foot">
-          <span>
-            Mostrando {visible.length} de {canManage ? dishes.length : visible.length}{" "}
-            {dishes.length === 1 ? "plato" : "platos"}
-          </span>
-          {canManage ? (
-            <span>
-              {pendingRecipe === 1
-                ? "1 receta por configurar"
-                : `${pendingRecipe} recetas por configurar`}
-            </span>
-          ) : null}
-        </div>
+        <TablePager
+          total={visible.length}
+          page={paged.current}
+          onPage={paged.setPage}
+          extra={
+            canManage ? (
+              <span>
+                {pendingRecipe === 1
+                  ? "1 receta por configurar"
+                  : `${pendingRecipe} recetas por configurar`}
+              </span>
+            ) : null
+          }
+        />
       </section>
 
       {statusTarget ? (

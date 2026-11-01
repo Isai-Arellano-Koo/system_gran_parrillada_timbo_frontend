@@ -5,6 +5,8 @@ import { ApiError } from "../api/client";
 import type { Ingredient, InventoryMovement, StockAlert } from "../types";
 import { orderCodeLabel } from "../types";
 import { matchesQuery } from "../helpers/search";
+import { usePagedRows } from "../helpers/pagination";
+import { TablePager } from "../components/TablePager";
 
 const MOVE_TYPES = [
   { value: "", label: "Todos los tipos" },
@@ -142,6 +144,12 @@ export function InventoryPage() {
     moveFrom,
     moveTo,
   ]);
+
+  const pagedStock = usePagedRows(visibleStock, `${stockQuery}|${stockFilter}`);
+  const pagedMoves = usePagedRows(
+    visibleMoves,
+    `${moveQuery}|${moveType}|${moveIngredientId}|${moveUserId}|${moveFrom}|${moveTo}`
+  );
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -290,7 +298,7 @@ export function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleStock.map((item) => {
+              {pagedStock.rows.map((item) => {
                 const low = Number(item.stock_current) <= Number(item.stock_minimum);
                 return (
                   <tr key={item.id}>
@@ -311,6 +319,11 @@ export function InventoryPage() {
             <div className="empty">Nada coincide con el filtro</div>
           ) : null}
         </div>
+        <TablePager
+          total={visibleStock.length}
+          page={pagedStock.current}
+          onPage={pagedStock.setPage}
+        />
       </section>
 
       <section className="panel">
@@ -403,7 +416,7 @@ export function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleMoves.map((m) => (
+              {pagedMoves.rows.map((m) => (
                 <tr key={m.id}>
                   <td>
                     {m.created_at
@@ -432,6 +445,11 @@ export function InventoryPage() {
             </div>
           ) : null}
         </div>
+        <TablePager
+          total={visibleMoves.length}
+          page={pagedMoves.current}
+          onPage={pagedMoves.setPage}
+        />
       </section>
     </div>
   );

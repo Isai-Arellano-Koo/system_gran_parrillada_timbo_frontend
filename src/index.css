@@ -729,6 +729,22 @@ textarea:focus {
   padding-top: 0.85rem;
 }
 
+.pager {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pager-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.pager-nav .btn {
+  padding: 0.35rem 0.75rem;
+}
+
 .table-wrap a {
   color: inherit;
 }
@@ -2158,6 +2174,12 @@ button.badge:disabled {
 
   .list-foot {
     flex-direction: column;
+  }
+
+  .pager-nav {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
   }
 
   .status-row,

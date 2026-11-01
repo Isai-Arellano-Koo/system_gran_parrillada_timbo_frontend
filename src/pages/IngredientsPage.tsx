@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import type { Ingredient } from "../types";
 import { matchesQuery } from "../helpers/search";
+import { usePagedRows } from "../helpers/pagination";
+import { TablePager } from "../components/TablePager";
 
 const UNITS = ["kg", "g", "lt", "ml", "unidad"] as const;
 type Unit = (typeof UNITS)[number];
@@ -102,6 +104,7 @@ export function IngredientsPage() {
       ),
     [items, query]
   );
+  const paged = usePagedRows(visible, query);
 
   const toggleActive = async (item: Ingredient) => {
     if (!token) return;
@@ -227,7 +230,7 @@ export function IngredientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((item) => {
+                {paged.rows.map((item) => {
                   const low =
                     item.is_active &&
                     Number(item.stock_current) <= Number(item.stock_minimum);
@@ -275,6 +278,11 @@ export function IngredientsPage() {
               </div>
             ) : null}
           </div>
+          <TablePager
+            total={visible.length}
+            page={paged.current}
+            onPage={paged.setPage}
+          />
         </section>
       </div>
     </div>
