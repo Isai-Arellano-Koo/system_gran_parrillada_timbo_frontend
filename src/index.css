@@ -702,6 +702,19 @@ textarea:focus {
   flex: 1;
 }
 
+.list-head-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.list-head-tools input {
+  max-width: 320px;
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1121,6 +1134,12 @@ button.badge:disabled {
 
 .dialog {
   width: min(440px, 100%);
+}
+
+.dialog.dialog-wide {
+  width: min(720px, 100%);
+  max-height: min(90dvh, 840px);
+  overflow: auto;
 }
 
 .dialog textarea,
@@ -2167,7 +2186,9 @@ button.badge:disabled {
     font-size: 1.4rem;
   }
 
-  .list-head input {
+  .list-head input,
+  .list-head-tools,
+  .list-head-tools input {
     max-width: none;
     width: 100%;
   }
