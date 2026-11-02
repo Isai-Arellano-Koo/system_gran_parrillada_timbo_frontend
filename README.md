@@ -14,10 +14,9 @@ Cada colaborador inicia sesión y ve solo las pantallas de su rol: el administra
 | Sprint | Historias | Funcionalidad |
 |---|---|---|
 | Sprint 1 | HU16, HU01, HU02, HU03 | Registro de usuarios por rol, inicio de sesión, ingredientes, stock inicial y entradas |
-| Sprint 2 | HU04, HU05, HU06, HU07 y mejoras aprobadas | Registro de platos y categorías, recetas, apertura de pedidos por mesa, agregar platos con observaciones; historial de cambios de estado de usuarios |
-| Siguientes | HU08 a HU15 | Validación de disponibilidad, confirmación, comandas, descuento de inventario, cancelaciones, movimientos y alertas |
+| Sprint 2 | Historias del Sprint Backlog entre HU04 y HU15, y mejoras aprobadas | Carta y recetas, flujo del pedido (apertura, validación de stock, confirmación, extras, pago y cierre), cocina, movimientos y alertas de inventario, historial de cambios de estado de usuarios |
 
-El repositorio ya incluye pantallas de módulos de sprints posteriores (platos, pedidos, cocina). Su validación formal contra los criterios de aceptación se hace en el sprint que corresponda, según el Product Backlog.
+Qué historias entraron en cada sprint y su estado de validación se registran en el tablero de Trello.
 
 ## Tecnologías
 
@@ -82,10 +81,10 @@ En el despliegue, `VITE_API_URL` debe apuntar a la URL pública del backend y de
 | `/categories` | Categorías de la carta | admin |
 | `/dishes/recetas`, `/dishes/:id/receta` | Recetas de cada plato (HU05) | admin |
 | `/ingredients` | Ingredientes (HU02) | admin |
-| `/inventory` | Inventario: stock y entradas (HU03) | admin |
+| `/inventory` | Inventario: entradas de stock, movimientos con filtros (HU14) y alertas de stock mínimo (HU15) | admin |
 | `/dishes` | Carta de platos, con pestañas por categoría (HU04) | admin, mesero |
-| `/orders` | Pedidos: abrir pedido por mesa y agregar platos con observaciones (HU06, HU07) | admin, mesero |
-| `/kitchen` | Comandas de cocina | admin, cocinero, mesero |
+| `/orders` | Pedidos: abrir por mesa, agregar platos con observaciones, validar stock, confirmar, enviar extras, registrar el pago, cerrar o cancelar (HU06 a HU09, HU13) | admin, mesero |
+| `/kitchen` | Comandas de cocina: estado de la comanda y de cada plato (HU10, HU11) | admin, cocinero, mesero |
 
 Las rutas protegidas redirigen al inicio de sesión si no hay sesión activa, y al inicio si el rol no tiene permiso. El login acepta correo o nombre de usuario. Si la cuenta aún no confirmó su correo, el sistema pide el código de verificación antes de dejar entrar.
 
@@ -94,9 +93,10 @@ Las rutas protegidas redirigen al inicio de sesión si no hay sesión activa, y 
 ```
 src/
 ├── api/           # Cliente HTTP, servicios y armado del cuerpo de login
-├── components/    # AppLayout, ProtectedRoute, ThemeToggle
+├── components/    # AppLayout, ProtectedRoute, ThemeToggle, TablePager, UserStatusHistory
 ├── constants/     # Roles y sus descripciones
 ├── context/       # AuthContext y ThemeContext
+├── helpers/       # Fechas, paginación y búsqueda
 ├── pages/         # Una pantalla por módulo
 ├── types/         # Tipos compartidos
 ├── App.tsx        # Rutas de la aplicación
@@ -127,21 +127,31 @@ Cubre el armado del cuerpo de login (correo si el identificador contiene `@`, us
 | Pantallas y menú según el rol | Cada colaborador ve solo lo que usa en su trabajo: el mesero no necesita ingredientes ni usuarios. |
 | Un solo campo de acceso (correo o usuario) | El cuerpo del login se arma según el texto escrito, para que el personal entre como prefiera (pruebas `loginBody`). |
 | Tema claro y oscuro | Cada usuario puede elegir el tema que le resulte más cómodo a la vista. |
+| Búsqueda, filtros y paginación en las tablas | Con una carta de 19 categorías y muchos movimientos de inventario, las listas largas se vuelven difíciles de usar. |
 | Menú lateral adaptable (responsive) | El menú se adapta al tamaño de pantalla para poder usar el sistema en computadora o en dispositivos más pequeños. |
 | React con Context API en lugar de una librería de estado | El estado compartido es poco (sesión y tema), así que no justificaba sumar otra dependencia. |
 
 ## Cómo demostrar el Sprint 1
 
 1. Abrir `/login` e ingresar como administrador.
-2. Ir a **Usuarios** y crear un mesero (HU16).
-3. Ir a **Ingredientes** y registrar un insumo de la parrilla (HU02).
-4. Ir a **Inventario** y registrar el stock inicial y una entrada (HU03).
-5. Cerrar sesión e ingresar como mesero para comprobar que ya no ve esas pantallas (HU01).
+2. Ir a **Usuarios** y crear un mesero.
+3. Ir a **Ingredientes** y registrar un insumo de la parrilla.
+4. Ir a **Inventario** y registrar el stock inicial y una entrada.
+5. Cerrar sesión e ingresar como mesero para comprobar que ya no ve esas pantallas.
+
+## Cómo demostrar el Sprint 2
+
+1. Como administrador, abrir **Platos** y revisar la carta por categorías; abrir la receta de un plato.
+2. Ir a **Inventario**, registrar una entrada de stock y revisar los movimientos con sus filtros y las alertas de stock mínimo.
+3. Como mesero, abrir **Pedidos**, elegir una mesa, buscar un plato, agregarlo con una observación y validar el stock.
+4. Confirmar el pedido y comprobar que aparece en **Cocina**.
+5. Como cocinero, cambiar el estado de la comanda y de un plato.
+6. Como mesero, enviar un plato extra, marcar el pago y cerrar el pedido.
 
 ## Pendiente y limitaciones
 
-- Sprint 2 en curso: la carta de platos, las recetas y la apertura de pedidos están implementadas; falta validarlas contra sus criterios de aceptación y la Definition of Done.
-- La pantalla de cocina y los módulos posteriores se validan formalmente en los siguientes sprints.
+- Las pantallas del Sprint 2 están implementadas; su validación final contra los criterios de aceptación y la Definition of Done queda registrada en Trello.
+- Las pruebas automáticas del frontend son pocas (login y roles); la mayor parte de la verificación de pantallas es manual.
 - La aplicación depende del backend: si la API no está disponible, las pantallas no muestran datos.
 
 ## Equipo
@@ -152,7 +162,7 @@ Cubre el armado del cuerpo de login (correo si el identificador contiene `@`, us
 | Alessandro Del Piero Chavarria Medina | Scrum Master / Developer | Facilitación de Scrum, seguimiento del tablero y README |
 | Isai Kaleb Arellano Koo | Developer | Desarrollo del backend y del frontend (código y base de datos) |
 | Paul Marcelo Challco Peña | Integrator / UX-UI | Informe técnico y documentación |
-| Victor Samir Huallpa Alvites | Developer | Desarrollo; apoyo a Isai y a Mateo en distintas historias |
+| Victor Samir Huallpa Alvites | Developer | Apoyo en desarrollo a Isai y a Mateo, y pruebas del Sprint 2 en el backend |
 
 ## Uso de herramientas de IA
 
