@@ -23,6 +23,7 @@ export function IngredientsPage() {
   const [ok, setOk] = useState("");
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
   const load = async () => {
     if (!token) return;
@@ -35,17 +36,25 @@ export function IngredientsPage() {
     );
   }, [token]);
 
-  const resetForm = () => {
+  const resetForm = (open = false) => {
     setEditingId(null);
     setName("");
     setUnit("kg");
     setStockMinimum("0");
     setActive(true);
+    setShowForm(open);
+  };
+
+  const openCreate = () => {
+    setError("");
+    setOk("");
+    resetForm(true);
   };
 
   const startEdit = (item: Ingredient) => {
     setError("");
     setOk("");
+    setShowForm(true);
     setEditingId(item.id);
     setName(item.name);
     setUnit(item.unit);
@@ -79,9 +88,9 @@ export function IngredientsPage() {
           await catalogApi.updateIngredient(token, created.id, { is_active: false });
         }
         setOk("Ingrediente registrado. El stock se carga en Inventario.");
-        resetForm();
       }
       await load();
+      resetForm();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar");
     } finally {
@@ -131,79 +140,12 @@ export function IngredientsPage() {
         <Link className="btn btn-ghost" to="/inventory">
           Ir a inventario
         </Link>
-        {editingId ? (
-          <button type="button" className="btn btn-ghost" onClick={resetForm}>
-            Nuevo ingrediente
-          </button>
-        ) : null}
       </div>
 
-      <div className="grid-2">
-        <section className="panel">
-          <h2>{editingId ? "Editar ingrediente" : "Nuevo ingrediente"}</h2>
-          {error ? <div className="alert alert-error">{error}</div> : null}
-          {ok ? <div className="alert alert-ok">{ok}</div> : null}
-          <form className="form-grid" onSubmit={onSubmit}>
-            <label>
-              Nombre
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Unidad
-              <select
-                value={unit}
-                onChange={(e) => setUnit(e.target.value as Unit)}
-              >
-                {UNITS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Stock mínimo
-              <input
-                type="number"
-                min="0"
-                step="0.001"
-                value={stockMinimum}
-                onChange={(e) => setStockMinimum(e.target.value)}
-              />
-            </label>
-            <label className={`switch${active ? " on" : ""}`}>
-              <input
-                type="checkbox"
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-              />
-              <span className="switch-ui" />
-              <span className="switch-label">
-                {active ? "Activo" : "Inactivo"}
-              </span>
-            </label>
-            <div className="form-footer">
-              {editingId ? (
-                <button type="button" className="btn btn-ghost" onClick={resetForm}>
-                  Cancelar
-                </button>
-              ) : null}
-              <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving
-                  ? "Guardando..."
-                  : editingId
-                    ? "Guardar cambios"
-                    : "Guardar"}
-              </button>
-            </div>
-          </form>
-        </section>
+      {error && !showForm ? <div className="alert alert-error">{error}</div> : null}
+      {ok && !showForm ? <div className="alert alert-ok">{ok}</div> : null}
 
-        <section className="panel">
+      <section className="panel">
           <div className="list-head">
             <div>
               <h2>Listado</h2>
@@ -211,12 +153,17 @@ export function IngredientsPage() {
                 {visible.length} {visible.length === 1 ? "ingrediente" : "ingredientes"}
               </p>
             </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre, unidad, stock…"
-              aria-label="Buscar ingrediente"
-            />
+            <div className="list-head-tools">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nombre, unidad, stock…"
+                aria-label="Buscar ingrediente"
+              />
+              <button type="button" className="btn btn-primary" onClick={openCreate}>
+                Agregar ingrediente
+              </button>
+            </div>
           </div>
           <div className="table-wrap">
             <table>
@@ -283,8 +230,91 @@ export function IngredientsPage() {
             page={paged.current}
             onPage={paged.setPage}
           />
-        </section>
-      </div>
+      </section>
+
+      {showForm ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!saving) resetForm();
+          }}
+        >
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ingredient-form-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="ingredient-form-title">
+              {editingId ? "Editar ingrediente" : "Agregar ingrediente"}
+            </h2>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <form className="form-grid" onSubmit={onSubmit}>
+              <label>
+                Nombre
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Unidad
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value as Unit)}
+                >
+                  {UNITS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Stock mínimo
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={stockMinimum}
+                  onChange={(e) => setStockMinimum(e.target.value)}
+                />
+              </label>
+              <label className={`switch${active ? " on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={(e) => setActive(e.target.checked)}
+                />
+                <span className="switch-ui" />
+                <span className="switch-label">
+                  {active ? "Activo" : "Inactivo"}
+                </span>
+              </label>
+              <div className="form-footer">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => resetForm()}
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving
+                    ? "Guardando..."
+                    : editingId
+                      ? "Guardar cambios"
+                      : "Guardar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

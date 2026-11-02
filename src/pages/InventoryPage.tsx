@@ -63,6 +63,8 @@ export function InventoryPage() {
   const [moveUserId, setMoveUserId] = useState("");
   const [moveFrom, setMoveFrom] = useState("");
   const [moveTo, setMoveTo] = useState("");
+  const [showEntry, setShowEntry] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     if (!token) return;
@@ -151,11 +153,23 @@ export function InventoryPage() {
     `${moveQuery}|${moveType}|${moveIngredientId}|${moveUserId}|${moveFrom}|${moveTo}`
   );
 
+  const closeEntry = () => {
+    if (saving) return;
+    setShowEntry(false);
+  };
+
+  const openEntry = () => {
+    setError("");
+    setOk("");
+    setShowEntry(true);
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setError("");
     setOk("");
+    setSaving(true);
     try {
       await inventoryApi.createEntry(token, {
         ingredient_id: Number(ingredientId),
@@ -164,9 +178,12 @@ export function InventoryPage() {
       });
       setQuantity("");
       setOk("Entrada registrada y stock actualizado");
+      setShowEntry(false);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -177,56 +194,15 @@ export function InventoryPage() {
           <h1>Inventario</h1>
           <p>Registra entradas, revisa los movimientos y las alertas de stock.</p>
         </div>
+        <button type="button" className="btn btn-primary" onClick={openEntry}>
+          Registrar entrada
+        </button>
       </div>
 
-      {error ? <div className="alert alert-error">{error}</div> : null}
-      {ok ? <div className="alert alert-ok">{ok}</div> : null}
+      {error && !showEntry ? <div className="alert alert-error">{error}</div> : null}
+      {ok && !showEntry ? <div className="alert alert-ok">{ok}</div> : null}
 
-      <div className="grid-2">
-        <section className="panel">
-          <h2>Registrar entrada</h2>
-          <form className="form-grid" onSubmit={onSubmit}>
-            <label>
-              Ingrediente
-              <select
-                value={ingredientId}
-                onChange={(e) => setIngredientId(e.target.value)}
-                required
-              >
-                <option value="">Seleccionar...</option>
-                {ingredients.map((ing) => (
-                  <option key={ing.id} value={ing.id}>
-                    {ing.name} — stock {Number(ing.stock_current)} {ing.unit}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Cantidad
-              <input
-                type="number"
-                min="0.001"
-                step="0.001"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Motivo
-              <input
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                required
-              />
-            </label>
-            <button className="btn btn-primary" type="submit">
-              Registrar entrada
-            </button>
-          </form>
-        </section>
-
-        <section className="panel">
+      <section className="panel">
           <h2>Alertas de stock mínimo</h2>
           {alerts.length === 0 ? (
             <div className="empty">Sin alertas activas</div>
@@ -256,8 +232,7 @@ export function InventoryPage() {
               </table>
             </div>
           )}
-        </section>
-      </div>
+      </section>
 
       <section className="panel">
         <div className="list-head">
@@ -451,6 +426,74 @@ export function InventoryPage() {
           onPage={pagedMoves.setPage}
         />
       </section>
+
+      {showEntry ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={closeEntry}
+        >
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inventory-entry-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="inventory-entry-title">Registrar entrada</h2>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <form className="form-grid" onSubmit={onSubmit}>
+              <label>
+                Ingrediente
+                <select
+                  value={ingredientId}
+                  onChange={(e) => setIngredientId(e.target.value)}
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {ingredients.map((ing) => (
+                    <option key={ing.id} value={ing.id}>
+                      {ing.name} — stock {Number(ing.stock_current)} {ing.unit}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cantidad
+                <input
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Motivo
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  required
+                />
+              </label>
+              <div className="form-footer">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeEntry}
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving ? "Guardando..." : "Registrar entrada"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
