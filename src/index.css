@@ -727,6 +727,38 @@ textarea:focus {
   min-width: min(100%, 160px);
 }
 
+.filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  align-items: end;
+}
+
+.filter-grid label {
+  margin: 0;
+  min-width: 0;
+}
+
+.filter-grid input,
+.filter-grid select {
+  width: 100%;
+  max-width: none;
+}
+
+.filter-dates {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.filter-dates .btn {
+  white-space: nowrap;
+  height: fit-content;
+}
+
 .list-head p,
 .list-foot {
   margin: 0;
@@ -2173,7 +2205,9 @@ button.badge:disabled {
 
   .grid-3,
   .form-row,
-  .recipe-row {
+  .recipe-row,
+  .filter-grid,
+  .filter-dates {
     grid-template-columns: 1fr;
   }
 

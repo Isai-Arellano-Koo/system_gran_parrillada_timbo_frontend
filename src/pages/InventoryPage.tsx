@@ -242,25 +242,29 @@ export function InventoryPage() {
               {visibleStock.length} {visibleStock.length === 1 ? "insumo" : "insumos"}
             </p>
           </div>
-          <input
-            value={stockQuery}
-            onChange={(e) => setStockQuery(e.target.value)}
-            placeholder="Buscar insumo, unidad, cantidad…"
-            aria-label="Buscar stock"
-          />
         </div>
-        <div className="filter-bar">
-          <select
-            value={stockFilter}
-            onChange={(e) =>
-              setStockFilter(e.target.value as "all" | "low" | "empty")
-            }
-            aria-label="Filtrar stock"
-          >
-            <option value="all">Todo el stock</option>
-            <option value="low">Bajo mínimo</option>
-            <option value="empty">Sin stock</option>
-          </select>
+        <div className="filter-grid">
+          <label>
+            Buscar
+            <input
+              value={stockQuery}
+              onChange={(e) => setStockQuery(e.target.value)}
+              placeholder="Insumo, unidad, cantidad…"
+            />
+          </label>
+          <label>
+            Estado
+            <select
+              value={stockFilter}
+              onChange={(e) =>
+                setStockFilter(e.target.value as "all" | "low" | "empty")
+              }
+            >
+              <option value="all">Todo el stock</option>
+              <option value="low">Bajo mínimo</option>
+              <option value="empty">Sin stock</option>
+            </select>
+          </label>
         </div>
         <div className="table-wrap">
           <table>
@@ -310,72 +314,86 @@ export function InventoryPage() {
               {visibleMoves.length === 1 ? "movimiento" : "movimientos"}
             </p>
           </div>
-          <input
-            value={moveQuery}
-            onChange={(e) => setMoveQuery(e.target.value)}
-            placeholder="Buscar insumo, tipo, motivo, usuario, pedido…"
-            aria-label="Buscar movimiento"
-          />
         </div>
-        <div className="filter-bar">
-          <select
-            value={moveIngredientId}
-            onChange={(e) => setMoveIngredientId(e.target.value)}
-            aria-label="Filtrar por ingrediente"
-          >
-            <option value="">Todos los ingredientes</option>
-            {ingredients.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={moveType}
-            onChange={(e) => setMoveType(e.target.value)}
-            aria-label="Filtrar por tipo"
-          >
-            {MOVE_TYPES.map((item) => (
-              <option key={item.value || "all"} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={moveUserId}
-            onChange={(e) => setMoveUserId(e.target.value)}
-            aria-label="Filtrar por usuario"
-          >
-            <option value="">Todos los usuarios</option>
-            {moveUsers.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={moveFrom}
-            onChange={(e) => setMoveFrom(e.target.value)}
-            aria-label="Desde"
-          />
-          <input
-            type="date"
-            value={moveTo}
-            onChange={(e) => setMoveTo(e.target.value)}
-            aria-label="Hasta"
-          />
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              const today = toDateInput(startOfToday());
-              setMoveFrom(today);
-              setMoveTo(today);
-            }}
-          >
-            Hoy
-          </button>
+        <div className="filter-grid">
+          <label>
+            Buscar
+            <input
+              value={moveQuery}
+              onChange={(e) => setMoveQuery(e.target.value)}
+              placeholder="Insumo, tipo, motivo, usuario, pedido…"
+            />
+          </label>
+          <label>
+            Ingrediente
+            <select
+              value={moveIngredientId}
+              onChange={(e) => setMoveIngredientId(e.target.value)}
+            >
+              <option value="">Todos los ingredientes</option>
+              {ingredients.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Tipo
+            <select
+              value={moveType}
+              onChange={(e) => setMoveType(e.target.value)}
+            >
+              {MOVE_TYPES.map((item) => (
+                <option key={item.value || "all"} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Usuario
+            <select
+              value={moveUserId}
+              onChange={(e) => setMoveUserId(e.target.value)}
+            >
+              <option value="">Todos los usuarios</option>
+              {moveUsers.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="filter-dates">
+            <label>
+              Desde
+              <input
+                type="date"
+                value={moveFrom}
+                onChange={(e) => setMoveFrom(e.target.value)}
+              />
+            </label>
+            <label>
+              Hasta
+              <input
+                type="date"
+                value={moveTo}
+                onChange={(e) => setMoveTo(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                const today = toDateInput(startOfToday());
+                setMoveFrom(today);
+                setMoveTo(today);
+              }}
+            >
+              Hoy
+            </button>
+          </div>
         </div>
         <div className="table-wrap">
           <table>
