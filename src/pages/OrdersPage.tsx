@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail, TableItem } from "../types";
 import { dishLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
 import { formatTime } from "../helpers/datetime";
+import { matchesQuery } from "../helpers/search";
 
 type Shortage = {
   name: string;
@@ -90,6 +91,7 @@ export function OrdersPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [ticketOpen, setTicketOpen] = useState(true);
+  const [dishQuery, setDishQuery] = useState("");
 
   const editing = activeOrder?.status === "en_edicion";
   const canEditItems =
@@ -111,9 +113,22 @@ export function OrdersPage() {
 
   const visibleDishes = useMemo(() => {
     const list = dishes.filter((d) => d.is_active);
-    if (categoryId === "all") return list;
-    return list.filter((d) => d.category_id === categoryId);
-  }, [dishes, categoryId]);
+    const byCategory =
+      !dishQuery.trim() && categoryId !== "all"
+        ? list.filter((d) => d.category_id === categoryId)
+        : list;
+    return byCategory.filter((dish) =>
+      matchesQuery(
+        dishQuery,
+        dish.name,
+        dish.presentation,
+        dish.category?.name,
+        dish.description,
+        Number(dish.price),
+        `S/ ${Number(dish.price).toFixed(2)}`
+      )
+    );
+  }, [dishes, categoryId, dishQuery]);
 
   const qtyByDish = useMemo(() => {
     const map = new Map<number, number>();
@@ -360,6 +375,7 @@ export function OrdersPage() {
     setShortages([]);
     setShowCancel(false);
     setError("");
+    setDishQuery("");
   };
 
   const shortageFor = (detail: OrderDetail) => {
@@ -534,6 +550,13 @@ export function OrdersPage() {
 
           {canEditItems ? (
             <>
+              <input
+                className="pos-search"
+                value={dishQuery}
+                onChange={(e) => setDishQuery(e.target.value)}
+                placeholder="Buscar plato, categoría, precio…"
+                aria-label="Buscar plato en la carta"
+              />
               <div className="category-tabs pos-tabs">
                 <button
                   type="button"
@@ -584,7 +607,11 @@ export function OrdersPage() {
                 })}
               </div>
               {!visibleDishes.length ? (
-                <div className="empty">No hay platos en esta categoría</div>
+                <div className="empty">
+                  {dishQuery.trim()
+                    ? "Ningún plato coincide con la búsqueda"
+                    : "No hay platos en esta categoría"}
+                </div>
               ) : null}
             </>
           ) : (

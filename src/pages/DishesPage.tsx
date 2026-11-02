@@ -6,6 +6,9 @@ import { ApiError } from "../api/client";
 import type { Category, Dish } from "../types";
 import { dishLabel } from "../types";
 import { DishRecipePage } from "./DishRecipePage";
+import { matchesQuery } from "../helpers/search";
+import { usePagedRows } from "../helpers/pagination";
+import { TablePager } from "../components/TablePager";
 
 function hasRecipe(dish: Dish) {
   return (dish.recipe_items || []).length > 0;
@@ -61,7 +64,7 @@ export function DishesPage() {
     setParams(nextParams, { replace: true });
   };
 
-  const resetForm = () => {
+  const resetForm = (open = false) => {
     setEditingId(null);
     setName("");
     setPresentation("");
@@ -71,7 +74,13 @@ export function DishesPage() {
     setActive(true);
     setOriginalActive(true);
     setFormStatusReason("");
-    setShowForm(false);
+    setShowForm(open);
+  };
+
+  const openCreate = () => {
+    setError("");
+    setOk("");
+    resetForm(true);
   };
 
   const startEdit = (dish: Dish) => {
@@ -132,6 +141,7 @@ export function DishesPage() {
         setOriginalActive(active);
         setFormStatusReason("");
         await load();
+        resetForm();
       } else {
         const created = await catalogApi.createDish(token, {
           name: name.trim(),
@@ -205,14 +215,21 @@ export function DishesPage() {
         return false;
       }
       if (!text) return true;
-      return (
-        dish.name.toLowerCase().includes(text) ||
-        (dish.presentation || "").toLowerCase().includes(text) ||
-        (dish.category?.name || "").toLowerCase().includes(text) ||
-        (dish.description || "").toLowerCase().includes(text)
+      return matchesQuery(
+        text,
+        dish.name,
+        dish.presentation,
+        dish.category?.name,
+        dish.description,
+        Number(dish.price),
+        `S/ ${Number(dish.price).toFixed(2)}`,
+        dish.is_active ? "activo" : "inactivo",
+        hasRecipe(dish) ? "con receta" : "sin receta",
+        ...(dish.recipe_items || []).map((item) => item.ingredient?.name)
       );
     });
   }, [dishes, query, canManage, categoryTab]);
+  const paged = usePagedRows(visible, `${query}|${categoryTab}`);
 
   const activeCount = dishes.filter((dish) => dish.is_active).length;
   const inactiveCount = dishes.filter((dish) => dish.is_active === false).length;
@@ -236,8 +253,10 @@ export function DishesPage() {
     <div>
       <CatalogHeader canManage={canManage} tab={tab} onTab={setTab} />
 
-      {error ? <div className="alert alert-error">{error}</div> : null}
-      {ok ? <div className="alert alert-ok">{ok}</div> : null}
+      {error && !showForm && !statusTarget ? (
+        <div className="alert alert-error">{error}</div>
+      ) : null}
+      {ok && !showForm ? <div className="alert alert-ok">{ok}</div> : null}
 
       {canManage ? (
         <div className="catalog-cards">
@@ -250,20 +269,10 @@ export function DishesPage() {
             <div className="actions">
               <button
                 type="button"
-                className="btn btn-ghost"
-                onClick={() => setShowForm(false)}
-              >
-                Ver lista
-              </button>
-              <button
-                type="button"
                 className="btn btn-primary"
-                onClick={() => {
-                  resetForm();
-                  setShowForm(true);
-                }}
+                onClick={openCreate}
               >
-                Gestionar Platos
+                Agregar plato
               </button>
             </div>
           </article>
@@ -283,111 +292,6 @@ export function DishesPage() {
             </div>
           </article>
         </div>
-      ) : null}
-
-      {showForm && canManage ? (
-        <section className="panel">
-          <h2>{editingId ? "Editar plato" : "Registro de Plato"}</h2>
-          <form className="form-grid" onSubmit={save}>
-            <div className="form-row">
-              <label>
-                Nombre del plato
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ej. Parrillada Mixta"
-                  required
-                />
-              </label>
-              <label>
-                Presentación
-                <input
-                  value={presentation}
-                  onChange={(e) => setPresentation(e.target.value)}
-                  placeholder="Ej. Porción, 300 g, Botella"
-                />
-              </label>
-            </div>
-            <div className="form-row">
-              <label>
-                Categoría
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  required
-                >
-                  <option value="">Selecciona una categoría</option>
-                  {categories
-                    .filter((item) => item.is_active || String(item.id) === categoryId)
-                    .map((item) => (
-                      <option key={item.id} value={item.id} disabled={!item.is_active}>
-                        {item.name}
-                        {item.is_active ? "" : " (quitada)"}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                Precio (S/)
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Mayor a 0.00"
-                  required
-                />
-              </label>
-            </div>
-            <label>
-              Descripción
-              <textarea
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-            <div className="status-row">
-              <div>
-                <strong>Estado</strong>
-                <p>Activo: el mesero lo ve. Inactivo: queda fuera de la carta.</p>
-              </div>
-              <label className={`switch${active ? " on" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                />
-                <span className="switch-ui" />
-                <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
-              </label>
-            </div>
-            {editingId && active !== originalActive ? (
-              <label className="field">
-                <span>Motivo del cambio de estado</span>
-                <textarea
-                  value={formStatusReason}
-                  onChange={(e) => setFormStatusReason(e.target.value)}
-                  rows={3}
-                  required
-                />
-              </label>
-            ) : null}
-            <div className="form-footer">
-              <button type="button" className="btn btn-ghost" onClick={resetForm}>
-                Cancelar
-              </button>
-              <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving
-                  ? "Guardando..."
-                  : editingId
-                    ? "Guardar cambios"
-                    : "Guardar Plato"}
-              </button>
-            </div>
-          </form>
-        </section>
       ) : null}
 
       <div className="category-tabs" role="tablist" aria-label="Categorías de la carta">
@@ -427,12 +331,19 @@ export function DishesPage() {
               {visible.length} {visible.length === 1 ? "plato" : "platos"}
             </p>
           </div>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar plato..."
-            aria-label="Buscar plato"
-          />
+          <div className="list-head-tools">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por plato, categoría, precio, receta…"
+              aria-label="Buscar plato"
+            />
+            {canManage ? (
+              <button type="button" className="btn btn-primary" onClick={openCreate}>
+                Agregar plato
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="table-wrap">
           <table>
@@ -445,7 +356,7 @@ export function DishesPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((dish) => (
+              {paged.rows.map((dish) => (
                 <tr key={dish.id}>
                   <td>
                     <strong>{dishLabel(dish)}</strong>
@@ -497,20 +408,148 @@ export function DishesPage() {
             <div className="empty">No hay platos en esta categoría</div>
           ) : null}
         </div>
-        <div className="list-foot">
-          <span>
-            Mostrando {visible.length} de {canManage ? dishes.length : visible.length}{" "}
-            {dishes.length === 1 ? "plato" : "platos"}
-          </span>
-          {canManage ? (
-            <span>
-              {pendingRecipe === 1
-                ? "1 receta por configurar"
-                : `${pendingRecipe} recetas por configurar`}
-            </span>
-          ) : null}
-        </div>
+        <TablePager
+          total={visible.length}
+          page={paged.current}
+          onPage={paged.setPage}
+          extra={
+            canManage ? (
+              <span>
+                {pendingRecipe === 1
+                  ? "1 receta por configurar"
+                  : `${pendingRecipe} recetas por configurar`}
+              </span>
+            ) : null
+          }
+        />
       </section>
+
+      {showForm && canManage ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!saving) resetForm();
+          }}
+        >
+          <div
+            className="dialog dialog-wide panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dish-form-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="dish-form-dialog-title">
+              {editingId ? "Editar plato" : "Agregar plato"}
+            </h2>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <form className="form-grid" onSubmit={save}>
+              <div className="form-row">
+                <label>
+                  Nombre del plato
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej. Parrillada Mixta"
+                    required
+                  />
+                </label>
+                <label>
+                  Presentación
+                  <input
+                    value={presentation}
+                    onChange={(e) => setPresentation(e.target.value)}
+                    placeholder="Ej. Porción, 300 g, Botella"
+                  />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Categoría
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecciona una categoría</option>
+                    {categories
+                      .filter((item) => item.is_active || String(item.id) === categoryId)
+                      .map((item) => (
+                        <option key={item.id} value={item.id} disabled={!item.is_active}>
+                          {item.name}
+                          {item.is_active ? "" : " (quitada)"}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Precio (S/)
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Mayor a 0.00"
+                    required
+                  />
+                </label>
+              </div>
+              <label>
+                Descripción
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
+              <div className="status-row">
+                <div>
+                  <strong>Estado</strong>
+                  <p>Activo: el mesero lo ve. Inactivo: queda fuera de la carta.</p>
+                </div>
+                <label className={`switch${active ? " on" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={(e) => setActive(e.target.checked)}
+                  />
+                  <span className="switch-ui" />
+                  <span className="switch-label">{active ? "Activo" : "Inactivo"}</span>
+                </label>
+              </div>
+              {editingId && active !== originalActive ? (
+                <label className="field">
+                  <span>Motivo del cambio de estado</span>
+                  <textarea
+                    value={formStatusReason}
+                    onChange={(e) => setFormStatusReason(e.target.value)}
+                    rows={3}
+                    required
+                  />
+                </label>
+              ) : null}
+              <div className="form-footer">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => resetForm()}
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving
+                    ? "Guardando..."
+                    : editingId
+                      ? "Guardar cambios"
+                      : "Guardar plato"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {statusTarget ? (
         <div

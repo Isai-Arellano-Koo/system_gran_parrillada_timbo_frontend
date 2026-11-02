@@ -216,8 +216,27 @@ export const inventoryApi = {
       token,
       body,
     }),
-  listMovements: (token: string) =>
-    apiRequest<InventoryMovement[]>("/api/inventory/movements", { token }),
+  listMovements: (
+    token: string,
+    filters?: {
+      ingredient_id?: number | string;
+      type?: string;
+      user_id?: number | string;
+      from?: string;
+      to?: string;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (filters?.ingredient_id) query.set("ingredient_id", String(filters.ingredient_id));
+    if (filters?.type) query.set("type", filters.type);
+    if (filters?.user_id) query.set("user_id", String(filters.user_id));
+    if (filters?.from) query.set("from", filters.from);
+    if (filters?.to) query.set("to", filters.to);
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return apiRequest<InventoryMovement[]>(`/api/inventory/movements${suffix}`, {
+      token,
+    });
+  },
   listAlerts: (token: string) =>
     apiRequest<StockAlert[]>("/api/inventory/alerts", { token }),
 };

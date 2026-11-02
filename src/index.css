@@ -697,9 +697,34 @@ textarea:focus {
 }
 
 .list-head input {
-  max-width: 240px;
+  max-width: 320px;
   min-width: min(100%, 180px);
   flex: 1;
+}
+
+.list-head-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.list-head-tools input {
+  max-width: 320px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: -0.25rem 0 0.85rem;
+}
+
+.filter-bar select,
+.filter-bar input[type="date"] {
+  min-width: min(100%, 160px);
 }
 
 .list-head p,
@@ -715,6 +740,22 @@ textarea:focus {
   justify-content: space-between;
   gap: 1rem;
   padding-top: 0.85rem;
+}
+
+.pager {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pager-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.pager-nav .btn {
+  padding: 0.35rem 0.75rem;
 }
 
 .table-wrap a {
@@ -1093,6 +1134,12 @@ button.badge:disabled {
 
 .dialog {
   width: min(440px, 100%);
+}
+
+.dialog.dialog-wide {
+  width: min(720px, 100%);
+  max-height: min(90dvh, 840px);
+  overflow: auto;
 }
 
 .dialog textarea,
@@ -1550,12 +1597,19 @@ button.badge:disabled {
 }
 
 .pos-menu-head,
-.pos-tabs {
+.pos-tabs,
+.pos-search {
   flex: none;
 }
 
 .pos-tabs {
   overflow-x: auto;
+}
+
+.pos-search {
+  width: 100%;
+  flex: none;
+  margin: 0.15rem 0 0.2rem;
 }
 
 .pos-menu-head {
@@ -2132,13 +2186,21 @@ button.badge:disabled {
     font-size: 1.4rem;
   }
 
-  .list-head input {
+  .list-head input,
+  .list-head-tools,
+  .list-head-tools input {
     max-width: none;
     width: 100%;
   }
 
   .list-foot {
     flex-direction: column;
+  }
+
+  .pager-nav {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
   }
 
   .status-row,
