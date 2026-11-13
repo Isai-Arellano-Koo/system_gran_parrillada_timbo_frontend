@@ -8,13 +8,15 @@ import type { UserRole } from "../types";
 type NavItem = {
   to: string;
   label: string;
-  icon: "home" | "orders" | "dishes" | "categories" | "ingredients" | "inventory" | "kitchen" | "users";
+  icon: "home" | "orders" | "delivery" | "sales" | "dishes" | "categories" | "ingredients" | "inventory" | "kitchen" | "users";
   roles: UserRole[];
 };
 
 const NAV: NavItem[] = [
   { to: "/", label: "Resumen", icon: "home", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", icon: "orders", roles: ["admin", "mesero"] },
+  { to: "/delivery", label: "Pedidos delivery", icon: "delivery", roles: ["admin", "cajero"] },
+  { to: "/sales", label: "Platos vendidos", icon: "sales", roles: ["admin", "cajero"] },
   { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin", "mesero"] },
   { to: "/categories", label: "Categorías", icon: "categories", roles: ["admin"] },
   { to: "/ingredients", label: "Ingredientes", icon: "ingredients", roles: ["admin"] },
@@ -39,6 +41,24 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
       <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6 3h9l3 3v15H6z" />
         <path d="M15 3v3h3M9 12h6M9 16h6" />
+      </svg>
+    );
+  }
+  if (name === "delivery") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 7h11v10H3z" />
+        <path d="M14 10h4l3 3v4h-7" />
+        <circle cx="7" cy="18" r="1.6" />
+        <circle cx="17" cy="18" r="1.6" />
+      </svg>
+    );
+  }
+  if (name === "sales") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 19V5M4 19h16" />
+        <path d="M7 15l4-5 3 3 5-7" />
       </svg>
     );
   }

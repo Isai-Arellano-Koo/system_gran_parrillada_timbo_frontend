@@ -91,10 +91,11 @@ export function dishLabel(dish: {
 export function orderCodeLabel(order: {
   id?: number;
   code: string;
-  table_id: number;
+  table_id?: number | null;
   table?: { number?: number } | null;
   created_at?: string;
 }) {
+  if (/^D-?\d{4}-\d+$/i.test(order.code)) return order.code;
   if (/^M\d{2}-\d{4}-\d+$/i.test(order.code)) return order.code;
   const table = String(order.table?.number ?? order.table_id).padStart(2, "0");
   const date = order.created_at ? new Date(order.created_at) : null;
@@ -127,11 +128,11 @@ export type OrderDetail = {
   dish?: Dish;
 };
 
-export function kitchenStatusLabel(status?: string) {
+export function kitchenStatusLabel(status?: string, modality?: string) {
   if (status === "pendiente") return "Pendiente";
   if (status === "en_preparacion") return "En preparación";
   if (status === "listo") return "Listo para servir";
-  if (status === "entregado") return "En mesa";
+  if (status === "entregado") return modality === "delivery" ? "Entregado" : "En mesa";
   return status || "";
 }
 
@@ -144,11 +145,18 @@ export type KitchenTicket = {
   order?: Order;
 };
 
+export type AttentionModality = "mesa" | "delivery";
+
 export type Order = {
   id: number;
   code: string;
-  table_id: number;
+  modality?: AttentionModality;
+  table_id?: number | null;
   waiter_id: number;
+  delivery_customer_name?: string | null;
+  delivery_phone?: string | null;
+  delivery_address?: string | null;
+  delivery_note?: string | null;
   status: "en_edicion" | "confirmado" | "cerrado" | "cancelado";
   total: number | string;
   cancel_reason?: string | null;
@@ -158,10 +166,25 @@ export type Order = {
   confirmed_at?: string | null;
   closed_at?: string | null;
   created_at?: string;
-  table?: TableItem;
+  table?: TableItem | null;
   waiter?: User;
   details?: OrderDetail[];
   kitchen_ticket?: KitchenTicket | null;
+};
+
+export type SoldDish = {
+  id: number;
+  dish_id: number;
+  dish_name: string;
+  presentation?: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  order_id: number;
+  order_code: string;
+  modality: AttentionModality;
+  table_number?: number | null;
+  sold_at?: string | null;
 };
 
 export type InventoryMovement = {

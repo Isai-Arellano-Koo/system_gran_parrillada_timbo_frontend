@@ -9,6 +9,7 @@ import type {
   InventoryMovement,
   KitchenTicket,
   Order,
+  SoldDish,
   StockAlert,
   TableItem,
   User,
@@ -249,15 +250,34 @@ export const ordersApi = {
       method: "POST",
       token,
     }),
-  list: (token: string) =>
-    apiRequest<Order[]>("/api/orders", { token }),
+  list: (token: string, modality?: "mesa" | "delivery") =>
+    apiRequest<Order[]>(
+      modality ? `/api/orders?modality=${modality}` : "/api/orders",
+      { token }
+    ),
+  soldDishes: (token: string) =>
+    apiRequest<SoldDish[]>("/api/orders/sales", { token }),
   get: (token: string, orderId: number) =>
     apiRequest<Order>(`/api/orders/${orderId}`, { token }),
   open: (token: string, table_id: number) =>
     apiRequest<Order>("/api/orders", {
       method: "POST",
       token,
-      body: { table_id },
+      body: { table_id, modality: "mesa" },
+    }),
+  openDelivery: (
+    token: string,
+    body: {
+      delivery_customer_name: string;
+      delivery_phone: string;
+      delivery_address: string;
+      delivery_note?: string;
+    }
+  ) =>
+    apiRequest<Order>("/api/orders", {
+      method: "POST",
+      token,
+      body: { modality: "delivery", ...body },
     }),
   addDetail: (
     token: string,

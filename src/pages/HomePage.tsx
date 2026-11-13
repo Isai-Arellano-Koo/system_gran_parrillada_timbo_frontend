@@ -107,6 +107,7 @@ export function HomePage() {
   const { token, user } = useAuth();
   const role = user?.role;
   const canOrders = role === "admin" || role === "mesero";
+  const canDelivery = role === "admin" || role === "cajero";
   const canKitchen = role === "admin" || role === "mesero" || role === "cocinero";
   const canInventory = role === "admin";
   const canUsers = role === "admin";
@@ -252,6 +253,16 @@ export function HomePage() {
           {canOrders ? (
             <Link className="btn btn-primary" to="/orders">
               Abrir pedido
+            </Link>
+          ) : null}
+          {canDelivery ? (
+            <Link className="btn btn-primary" to="/delivery">
+              Pedido delivery
+            </Link>
+          ) : null}
+          {canDelivery ? (
+            <Link className="btn btn-ghost" to="/sales">
+              Platos vendidos
             </Link>
           ) : null}
           {canKitchen ? (

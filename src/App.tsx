@@ -11,6 +11,8 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { DishRecipePage } from "./pages/DishRecipePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
+import { DeliveryOrdersPage } from "./pages/DeliveryOrdersPage";
+import { SoldDishesPage } from "./pages/SoldDishesPage";
 import { KitchenPage } from "./pages/KitchenPage";
 import { UsersPage } from "./pages/UsersPage";
 import { UsersHistoryPage } from "./pages/UsersHistoryPage";
@@ -46,6 +48,12 @@ export default function App() {
               >
                 <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
+              </Route>
+              <Route
+                element={<ProtectedRoute roles={["admin", "cajero"]} />}
+              >
+                <Route path="/delivery" element={<DeliveryOrdersPage />} />
+                <Route path="/sales" element={<SoldDishesPage />} />
               </Route>
               <Route
                 element={

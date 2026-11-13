@@ -23,7 +23,7 @@ export const ROLE_OPTIONS: {
   {
     value: "cajero",
     label: "Cajero",
-    description: "Consulta el resumen del local.",
+    description: "Delivery, cobro y platos vendidos.",
   },
 ];
 

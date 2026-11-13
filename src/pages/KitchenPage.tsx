@@ -24,11 +24,11 @@ function nextStatus(current?: string) {
   return idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : null;
 }
 
-function nextLabel(status: KitchenTicket["status"]) {
+function nextLabel(status: KitchenTicket["status"], modality?: string) {
   if (status === "en_preparacion") return "En preparación";
   if (status === "listo") return "Listo";
-  if (status === "entregado") return "Salió a mesa";
-  return kitchenStatusLabel(status);
+  if (status === "entregado") return modality === "delivery" ? "Entregado" : "Salió a mesa";
+  return kitchenStatusLabel(status, modality);
 }
 
 function dishKitchenStatus(detail: OrderDetail) {
@@ -128,13 +128,20 @@ export function KitchenPage() {
                       : `Pedido #${ticket.order_id}`}
                   </strong>
                   <div className="muted">
-                    Mesa {ticket.order?.table?.number ?? "—"} · {ready}/
-                    {details.length} listos
+                    {ticket.order?.modality === "delivery"
+                      ? `Delivery · ${ticket.order.delivery_customer_name || "Sin nombre"}`
+                      : `Mesa ${ticket.order?.table?.number ?? "—"}`}{" "}
+                    · {ready}/{details.length} listos
                   </div>
                 </div>
-                <span className={`badge ${badgeFor(ticket.status)}`}>
-                  {kitchenStatusLabel(ticket.status)}
-                </span>
+                <div className="actions">
+                  <span className="badge badge-edit">
+                    {ticket.order?.modality === "delivery" ? "Delivery" : "Mesa"}
+                  </span>
+                  <span className={`badge ${badgeFor(ticket.status)}`}>
+                    {kitchenStatusLabel(ticket.status, ticket.order?.modality)}
+                  </span>
+                </div>
               </button>
 
               {open ? (
@@ -168,7 +175,7 @@ export function KitchenPage() {
                           </div>
                           <div className="kitchen-dish-actions">
                             <span className={`badge ${badgeFor(status)}`}>
-                              {kitchenStatusLabel(status)}
+                              {kitchenStatusLabel(status, ticket.order?.modality)}
                             </span>
                             {canAdvance && next ? (
                               <button
@@ -177,7 +184,7 @@ export function KitchenPage() {
                                 disabled={busyId === detail.id}
                                 onClick={() => advanceDish(detail)}
                               >
-                                {nextLabel(next)}
+                                {nextLabel(next, ticket.order?.modality)}
                               </button>
                             ) : null}
                           </div>
@@ -191,7 +198,10 @@ export function KitchenPage() {
                   {details.map((detail) => (
                     <li key={detail.id}>
                       {detail.quantity}× {detail.dish?.name || detail.dish_id} ·{" "}
-                      {kitchenStatusLabel(dishKitchenStatus(detail))}
+                      {kitchenStatusLabel(
+                        dishKitchenStatus(detail),
+                        ticket.order?.modality
+                      )}
                     </li>
                   ))}
                 </ul>
