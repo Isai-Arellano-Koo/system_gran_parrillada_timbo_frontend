@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
-import type { Category, Dish, Order, OrderDetail } from "../types";
-import { kitchenStatusLabel, orderCodeLabel } from "../types";
+import type { AttentionModality, Category, Dish, Order, OrderDetail } from "../types";
+import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
 import { formatTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
 
@@ -57,6 +57,10 @@ export function DeliveryOrdersPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [createModality, setCreateModality] = useState<"delivery" | "para_llevar">(
+    "para_llevar"
+  );
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -79,6 +83,13 @@ export function DeliveryOrdersPage() {
     () =>
       orders.filter(
         (order) => order.status === "en_edicion" || order.status === "confirmado"
+      ),
+    [orders]
+  );
+  const historyOrders = useMemo(
+    () =>
+      orders.filter(
+        (order) => order.status === "cerrado" || order.status === "cancelado"
       ),
     [orders]
   );
@@ -115,7 +126,7 @@ export function DeliveryOrdersPage() {
     const [categoryList, dishList, orderList] = await Promise.all([
       catalogApi.listCategories(token, true),
       catalogApi.listDishes(token, true),
-      ordersApi.list(token, "delivery"),
+      ordersApi.list(token, "offsite"),
     ]);
     setCategories(categoryList.filter((c) => c.is_active));
     setDishes(dishList.filter((d) => d.is_active));
@@ -162,12 +173,15 @@ export function DeliveryOrdersPage() {
     setError("");
     try {
       const created = await ordersApi.openDelivery(token, {
+        modality: createModality,
         delivery_customer_name: customerName.trim(),
-        delivery_phone: phone.trim(),
-        delivery_address: address.trim(),
+        delivery_phone: phone.trim() || undefined,
+        delivery_address:
+          createModality === "delivery" ? address.trim() : undefined,
         delivery_note: note.trim() || undefined,
       });
       setShowCreate(false);
+      setCreateModality("para_llevar");
       setCustomerName("");
       setPhone("");
       setAddress("");
@@ -287,7 +301,7 @@ export function DeliveryOrdersPage() {
     setError("");
     try {
       await ordersApi.close(token, activeOrder.id);
-      setMessage("Delivery cerrado");
+      setMessage("Pedido cerrado");
       setActiveOrder(null);
       await load();
     } catch (err) {
@@ -356,7 +370,10 @@ export function DeliveryOrdersPage() {
           <p className="muted">
             Cantidad: {detail.quantity}
             {sentLine
-              ? ` · ${kitchenStatusLabel(detail.kitchen_status || "pendiente", "delivery")}`
+              ? ` · ${kitchenStatusLabel(
+                  detail.kitchen_status || "pendiente",
+                  activeOrder?.modality
+                )}`
               : ""}
           </p>
         )}
@@ -387,15 +404,31 @@ export function DeliveryOrdersPage() {
       <div>
         <div className="page-head">
           <div>
-            <h1>Pedidos delivery</h1>
+            <h1>Delivery y para llevar</h1>
             <p>
-              Abre un pedido sin mesa, agrégale platos y confírmalo. Cocina ve
-              que es delivery y el inventario se descuenta igual que en salón.
+              Pedidos sin mesa. Elige Delivery o Para llevar, agrégale platos y
+              confírmalo. Cocina ve el tipo y el inventario se descuenta igual.
             </p>
           </div>
-          <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            Nuevo delivery
-          </button>
+          <div className="actions">
+            <button
+              type="button"
+              className={`btn ${showHistory ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setShowHistory((open) => !open)}
+            >
+              Historial
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setShowHistory(false);
+                setShowCreate(true);
+              }}
+            >
+              Nuevo pedido
+            </button>
+          </div>
         </div>
         {error ? <div className="alert alert-error">{error}</div> : null}
         {message ? <div className="alert alert-ok">{message}</div> : null}
@@ -403,9 +436,13 @@ export function DeliveryOrdersPage() {
         <section className="panel">
           <div className="list-head">
             <div>
-              <h2>En curso</h2>
+              <h2>{showHistory ? "Historial" : "En curso"}</h2>
               <p>
-                {openOrders.length} {openOrders.length === 1 ? "pedido" : "pedidos"}
+                {showHistory
+                  ? `${historyOrders.length} ${
+                      historyOrders.length === 1 ? "pedido cerrado" : "pedidos cerrados o cancelados"
+                    }`
+                  : `${openOrders.length} ${openOrders.length === 1 ? "pedido" : "pedidos"}`}
               </p>
             </div>
           </div>
@@ -414,6 +451,7 @@ export function DeliveryOrdersPage() {
               <thead>
                 <tr>
                   <th>Orden</th>
+                  <th>Tipo</th>
                   <th>Cliente</th>
                   <th>Teléfono</th>
                   <th>Estado</th>
@@ -422,12 +460,13 @@ export function DeliveryOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {openOrders.map((order) => (
+                {(showHistory ? historyOrders : openOrders).map((order) => (
                   <tr key={order.id}>
                     <td>
                       <strong>{orderCodeLabel(order)}</strong>
                       <div className="hint">{formatTime(order.created_at)}</div>
                     </td>
+                    <td>{attentionLabel(order.modality)}</td>
                     <td>{order.delivery_customer_name || "—"}</td>
                     <td>{order.delivery_phone || "—"}</td>
                     <td>
@@ -442,15 +481,19 @@ export function DeliveryOrdersPage() {
                         className="btn btn-ghost"
                         onClick={() => applyOrder(order)}
                       >
-                        Abrir
+                        Ver
                       </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!openOrders.length ? (
-              <div className="empty">No hay deliveries en curso</div>
+            {!(showHistory ? historyOrders : openOrders).length ? (
+              <div className="empty">
+                {showHistory
+                  ? "Aún no hay historial de delivery ni para llevar"
+                  : "No hay pedidos en curso"}
+              </div>
             ) : null}
           </div>
         </section>
@@ -470,9 +513,27 @@ export function DeliveryOrdersPage() {
               aria-labelledby="delivery-form-title"
               onClick={(event) => event.stopPropagation()}
             >
-              <h2 id="delivery-form-title">Nuevo pedido delivery</h2>
+              <h2 id="delivery-form-title">Nuevo pedido</h2>
               {error ? <div className="alert alert-error">{error}</div> : null}
               <form className="form-grid" onSubmit={createDelivery}>
+                <div className="page-tabs" role="tablist" aria-label="Tipo de pedido">
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`page-tab${createModality === "para_llevar" ? " active" : ""}`}
+                    onClick={() => setCreateModality("para_llevar")}
+                  >
+                    Para llevar
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`page-tab${createModality === "delivery" ? " active" : ""}`}
+                    onClick={() => setCreateModality("delivery")}
+                  >
+                    Delivery
+                  </button>
+                </div>
                 <div className="form-row">
                   <label>
                     Nombre del cliente
@@ -483,28 +544,34 @@ export function DeliveryOrdersPage() {
                     />
                   </label>
                   <label>
-                    Teléfono
+                    Teléfono {createModality === "para_llevar" ? "(opcional)" : ""}
                     <input
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      required
+                      required={createModality === "delivery"}
                     />
                   </label>
                 </div>
-                <label>
-                  Dirección
-                  <input
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    required
-                  />
-                </label>
+                {createModality === "delivery" ? (
+                  <label>
+                    Dirección
+                    <input
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      required
+                    />
+                  </label>
+                ) : null}
                 <label>
                   Nota (opcional)
                   <input
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Referencia, hora, pago contra entrega…"
+                    placeholder={
+                      createModality === "delivery"
+                        ? "Referencia, hora, pago contra entrega…"
+                        : "Sin cubiertos, para recoger…"
+                    }
                   />
                 </label>
                 <div className="form-footer">
@@ -544,12 +611,15 @@ export function DeliveryOrdersPage() {
                 load().catch(() => undefined);
               }}
             >
-              Deliveries
+              Pedidos
             </button>
             <div>
-              <h1>Delivery {orderCodeLabel(activeOrder)}</h1>
+              <h1>
+                {attentionLabel(activeOrder.modality)} {orderCodeLabel(activeOrder)}
+              </h1>
               <p>
-                {activeOrder.delivery_customer_name} · {activeOrder.delivery_phone}
+                {activeOrder.delivery_customer_name}
+                {activeOrder.delivery_phone ? ` · ${activeOrder.delivery_phone}` : ""}
               </p>
             </div>
             <span className={`badge ${statusClass(activeOrder.status)}`}>
@@ -632,7 +702,8 @@ export function DeliveryOrdersPage() {
               <div>
                 <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
                 <p>
-                  Delivery · {activeOrder.delivery_customer_name} ·{" "}
+                  {attentionLabel(activeOrder.modality)} ·{" "}
+                  {activeOrder.delivery_customer_name} ·{" "}
                   {formatTime(activeOrder.created_at)}
                 </p>
                 <p className="hint">

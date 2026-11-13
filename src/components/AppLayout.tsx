@@ -15,7 +15,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { to: "/", label: "Resumen", icon: "home", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", icon: "orders", roles: ["admin", "mesero"] },
-  { to: "/delivery", label: "Pedidos delivery", icon: "delivery", roles: ["admin", "cajero"] },
+  { to: "/delivery", label: "Delivery / llevar", icon: "delivery", roles: ["admin", "cajero"] },
   { to: "/sales", label: "Platos vendidos", icon: "sales", roles: ["admin", "cajero"] },
   { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin", "mesero"] },
   { to: "/categories", label: "Categorías", icon: "categories", roles: ["admin"] },

@@ -95,18 +95,19 @@ export function orderCodeLabel(order: {
   table?: { number?: number } | null;
   created_at?: string;
 }) {
-  if (/^D-?\d{4}-\d+$/i.test(order.code)) return order.code;
-  if (/^M\d{2}-\d{4}-\d+$/i.test(order.code)) return order.code;
-  const table = String(order.table?.number ?? order.table_id).padStart(2, "0");
-  const date = order.created_at ? new Date(order.created_at) : null;
-  const ddmm =
-    date && !Number.isNaN(date.getTime())
-      ? `${String(date.getDate()).padStart(2, "0")}${String(
-          date.getMonth() + 1
-        ).padStart(2, "0")}`
-      : "";
-  const tail = order.code.match(/(\d{2,3})$/)?.[1] || String(order.id || "");
-  return ddmm ? `M${table}-${ddmm}-${tail}` : `M${table}-${tail}`;
+  const code = order.code || "";
+  if (/^(MESA |DEL-|LLEVAR-)/i.test(code)) return code;
+  const mesa = code.match(/^M(\d{2})-\d{4}-(\d+)$/i);
+  if (mesa) return `MESA ${Number(mesa[1])}-${Number(mesa[2])}`;
+  const delivery = code.match(/^D-?\d{4}-(\d+)$/i);
+  if (delivery) return `DEL-${Number(delivery[1])}`;
+  return code || `Pedido ${order.id || ""}`;
+}
+
+export function attentionLabel(modality?: string) {
+  if (modality === "delivery") return "Delivery";
+  if (modality === "para_llevar") return "Para llevar";
+  return "Mesa";
 }
 
 export type TableItem = {
@@ -131,8 +132,14 @@ export type OrderDetail = {
 export function kitchenStatusLabel(status?: string, modality?: string) {
   if (status === "pendiente") return "Pendiente";
   if (status === "en_preparacion") return "En preparación";
-  if (status === "listo") return "Listo para servir";
-  if (status === "entregado") return modality === "delivery" ? "Entregado" : "En mesa";
+  if (status === "listo") {
+    if (modality === "delivery") return "Listo para envío";
+    if (modality === "para_llevar") return "Listo para recoger";
+    return "Listo para servir";
+  }
+  if (status === "entregado") {
+    return modality === "mesa" || !modality ? "En mesa" : "Entregado";
+  }
   return status || "";
 }
 
@@ -145,7 +152,7 @@ export type KitchenTicket = {
   order?: Order;
 };
 
-export type AttentionModality = "mesa" | "delivery";
+export type AttentionModality = "mesa" | "delivery" | "para_llevar";
 
 export type Order = {
   id: number;

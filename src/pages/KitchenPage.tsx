@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { kitchenApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { KitchenTicket, OrderDetail } from "../types";
-import { kitchenStatusLabel, orderCodeLabel } from "../types";
+import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
 
 const FLOW: KitchenTicket["status"][] = [
   "pendiente",
@@ -128,15 +128,17 @@ export function KitchenPage() {
                       : `Pedido #${ticket.order_id}`}
                   </strong>
                   <div className="muted">
-                    {ticket.order?.modality === "delivery"
-                      ? `Delivery · ${ticket.order.delivery_customer_name || "Sin nombre"}`
-                      : `Mesa ${ticket.order?.table?.number ?? "—"}`}{" "}
+                    {ticket.order?.modality === "mesa" || !ticket.order?.modality
+                      ? `Mesa ${ticket.order?.table?.number ?? "—"}`
+                      : `${attentionLabel(ticket.order.modality)} · ${
+                          ticket.order.delivery_customer_name || "Sin nombre"
+                        }`}{" "}
                     · {ready}/{details.length} listos
                   </div>
                 </div>
                 <div className="actions">
                   <span className="badge badge-edit">
-                    {ticket.order?.modality === "delivery" ? "Delivery" : "Mesa"}
+                    {attentionLabel(ticket.order?.modality)}
                   </span>
                   <span className={`badge ${badgeFor(ticket.status)}`}>
                     {kitchenStatusLabel(ticket.status, ticket.order?.modality)}

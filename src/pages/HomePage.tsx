@@ -257,7 +257,7 @@ export function HomePage() {
           ) : null}
           {canDelivery ? (
             <Link className="btn btn-primary" to="/delivery">
-              Pedido delivery
+              Delivery / llevar
             </Link>
           ) : null}
           {canDelivery ? (

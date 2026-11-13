@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
-import type { SoldDish } from "../types";
+import type { AttentionModality, SoldDish } from "../types";
+import { attentionLabel } from "../types";
 import { matchesQuery } from "../helpers/search";
 import { usePagedRows } from "../helpers/pagination";
 import { TablePager } from "../components/TablePager";
@@ -15,7 +16,7 @@ export function SoldDishesPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<SoldDish[]>([]);
   const [query, setQuery] = useState("");
-  const [modality, setModality] = useState<"all" | "mesa" | "delivery">("all");
+  const [modality, setModality] = useState<"all" | AttentionModality>("all");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function SoldDishesPage() {
           item.dish_name,
           item.presentation,
           item.order_code,
-          item.modality === "delivery" ? "delivery" : "mesa",
+          attentionLabel(item.modality),
           item.table_number ? `mesa ${item.table_number}` : ""
         );
       }),
@@ -84,12 +85,15 @@ export function SoldDishesPage() {
             <select
               value={modality}
               onChange={(e) =>
-                setModality(e.target.value as "all" | "mesa" | "delivery")
+                setModality(
+                  e.target.value as "all" | "mesa" | "delivery" | "para_llevar"
+                )
               }
             >
               <option value="all">Todas</option>
               <option value="mesa">Mesa</option>
               <option value="delivery">Delivery</option>
+              <option value="para_llevar">Para llevar</option>
             </select>
           </label>
         </div>
@@ -114,13 +118,7 @@ export function SoldDishesPage() {
                       : "—"}
                   </td>
                   <td>{item.order_code}</td>
-                  <td>
-                    {item.modality === "delivery"
-                      ? "Delivery"
-                      : item.table_number
-                        ? `Mesa ${String(item.table_number).padStart(2, "0")}`
-                        : "Mesa"}
-                  </td>
+                  <td>{attentionLabel(item.modality)}</td>
                   <td>
                     <strong>{item.dish_name}</strong>
                     {item.presentation ? (

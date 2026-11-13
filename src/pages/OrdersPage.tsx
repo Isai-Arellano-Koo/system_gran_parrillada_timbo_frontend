@@ -104,7 +104,7 @@ export function OrdersPage() {
   const openByTable = useMemo(() => {
     const map = new Map<number, Order>();
     for (const order of orders) {
-      if (order.modality === "delivery" || !order.table_id) continue;
+      if (order.modality !== "mesa" || !order.table_id) continue;
       if (order.status === "en_edicion" || order.status === "confirmado") {
         map.set(order.table_id, order);
       }

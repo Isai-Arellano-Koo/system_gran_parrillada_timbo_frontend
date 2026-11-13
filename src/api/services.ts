@@ -250,7 +250,7 @@ export const ordersApi = {
       method: "POST",
       token,
     }),
-  list: (token: string, modality?: "mesa" | "delivery") =>
+  list: (token: string, modality?: "mesa" | "delivery" | "para_llevar" | "offsite") =>
     apiRequest<Order[]>(
       modality ? `/api/orders?modality=${modality}` : "/api/orders",
       { token }
@@ -268,16 +268,17 @@ export const ordersApi = {
   openDelivery: (
     token: string,
     body: {
+      modality: "delivery" | "para_llevar";
       delivery_customer_name: string;
-      delivery_phone: string;
-      delivery_address: string;
+      delivery_phone?: string;
+      delivery_address?: string;
       delivery_note?: string;
     }
   ) =>
     apiRequest<Order>("/api/orders", {
       method: "POST",
       token,
-      body: { modality: "delivery", ...body },
+      body,
     }),
   addDetail: (
     token: string,
