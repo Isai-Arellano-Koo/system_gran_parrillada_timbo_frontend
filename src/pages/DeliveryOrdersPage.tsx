@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
-import type { AttentionModality, Category, Dish, Order, OrderDetail } from "../types";
+import type { Category, Dish, Order, OrderDetail } from "../types";
 import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
 import { formatTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
