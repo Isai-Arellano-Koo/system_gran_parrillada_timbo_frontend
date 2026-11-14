@@ -84,6 +84,16 @@ textarea {
 
 button {
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+a,
+.nav-link,
+.category-tab,
+.page-tab,
+.pos-dish-row,
+.table-chip {
+  touch-action: manipulation;
 }
 
 .app-shell {
@@ -329,7 +339,10 @@ button {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: 0.25rem 1.75rem 2.5rem;
+  padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 .page-head {
@@ -1354,6 +1367,8 @@ button.badge:disabled {
   padding: 0.15rem 0 0.85rem;
   margin-bottom: 0.15rem;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .category-tab {
@@ -1554,8 +1569,7 @@ button.badge:disabled {
   margin: 0.15rem 0 0.75rem;
 }
 
-.table-grid.dragging {
-  touch-action: none;
+.table-grid.joining {
   user-select: none;
 }
 
@@ -1570,8 +1584,15 @@ button.badge:disabled {
   padding: 0.85rem 0.6rem;
   text-align: center;
   box-shadow: var(--shadow);
-  touch-action: none;
+  touch-action: pan-y manipulation;
   user-select: none;
+  -webkit-user-select: none;
+}
+
+.table-tile.holding,
+.table-tile.dragging,
+.table-grid.joining .table-tile {
+  touch-action: none;
 }
 
 .table-tile strong {
@@ -1698,6 +1719,8 @@ button.badge:disabled {
 
 .pos-tabs {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .pos-search {
@@ -1743,6 +1766,8 @@ button.badge:disabled {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   align-content: start;
   padding-right: 0.15rem;
 }
@@ -1946,6 +1971,7 @@ button.badge:disabled {
   flex: 1 1 auto;
   min-height: 120px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pos-ticket-group {
@@ -2356,12 +2382,51 @@ button.badge:disabled {
     margin-left: 0;
   }
 
+  .pos-page.pos-live,
+  .pos-layout,
+  .pos-menu {
+    height: auto;
+    overflow: visible;
+    display: block;
+  }
+
   .pos-dish-list {
     grid-template-columns: 1fr;
+    overflow: visible;
+    flex: none;
+    padding-bottom: 5.5rem;
+  }
+
+  .pos-dish-row {
+    min-height: 52px;
+    padding: 0.65rem 0.7rem;
+  }
+
+  .category-tab,
+  .page-tab {
+    min-height: 44px;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   .table-grid {
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .table-tile {
+    min-height: 88px;
+  }
+
+  .pos-ticket-fab {
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .main,
+  .topbar {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   .ops-kpis {

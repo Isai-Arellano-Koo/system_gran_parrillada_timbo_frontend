@@ -131,6 +131,7 @@ export function OrdersPage() {
     startY: number;
     dragging: boolean;
     armed: boolean;
+    cancelled: boolean;
     pointerId: number;
     pointerType: string;
   } | null>(null);
@@ -337,6 +338,7 @@ export function OrdersPage() {
       startY: event.clientY,
       dragging: false,
       armed: !needsHold,
+      cancelled: false,
       pointerId: event.pointerId,
       pointerType: event.pointerType,
     };
@@ -353,7 +355,10 @@ export function OrdersPage() {
     const dx = event.clientX - current.startX;
     const dy = event.clientY - current.startY;
     if (!current.armed) {
-      if (dx * dx + dy * dy > 100) clearHoldTimer();
+      if (dx * dx + dy * dy > 64) {
+        current.cancelled = true;
+        clearHoldTimer();
+      }
       return;
     }
     if (!current.dragging && dx * dx + dy * dy < 64) return;
@@ -373,19 +378,32 @@ export function OrdersPage() {
     setOverId(next);
   };
 
-  const onTablePointerUp = async (
-    event: PointerEvent<HTMLButtonElement>,
-    table: TableItem
-  ) => {
+  const endTableGesture = () => {
     clearHoldTimer();
-    const current = pointer.current;
-    pointer.current = null;
-    const targetId = overRef.current;
     overRef.current = null;
     setGhost(null);
     setOverId(null);
     setHoldingId(null);
+  };
+
+  const onTablePointerCancel = (event: PointerEvent<HTMLButtonElement>) => {
+    const current = pointer.current;
+    if (current && current.pointerId === event.pointerId) {
+      pointer.current = null;
+    }
+    endTableGesture();
+  };
+
+  const onTablePointerUp = async (
+    event: PointerEvent<HTMLButtonElement>,
+    table: TableItem
+  ) => {
+    const current = pointer.current;
+    const targetId = overRef.current;
+    pointer.current = null;
+    endTableGesture();
     if (!current || current.pointerId !== event.pointerId) return;
+    if (current.cancelled) return;
     if (current.dragging) {
       if (targetId) await joinTables(current.tableId, targetId);
       return;
@@ -656,7 +674,7 @@ export function OrdersPage() {
             En el celular: deja presionado y suelta sobre la otra mesa. En
             computadora puedes arrastrar directo.
           </p>
-          <div className={`table-grid${ghost ? " dragging" : ""}`}>
+          <div className={`table-grid${ghost || holdingId ? " joining" : ""}`}>
             {tables.map((table) => {
               const open = openByTable.get(table.id);
               const state = tableState(open);
@@ -677,7 +695,7 @@ export function OrdersPage() {
                   onPointerDown={(event) => onTablePointerDown(event, table)}
                   onPointerMove={onTablePointerMove}
                   onPointerUp={(event) => onTablePointerUp(event, table)}
-                  onPointerCancel={(event) => onTablePointerUp(event, table)}
+                  onPointerCancel={onTablePointerCancel}
                   onContextMenu={(event) => event.preventDefault()}
                 >
                   <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
