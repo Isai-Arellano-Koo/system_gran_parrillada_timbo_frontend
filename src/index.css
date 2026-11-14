@@ -1550,6 +1550,15 @@ button.badge:disabled {
   gap: 0.7rem;
 }
 
+.table-join-hint {
+  margin: 0.15rem 0 0.75rem;
+}
+
+.table-grid.dragging {
+  touch-action: none;
+  user-select: none;
+}
+
 .table-tile {
   min-height: 96px;
   border: 1px solid var(--line);
@@ -1561,6 +1570,8 @@ button.badge:disabled {
   padding: 0.85rem 0.6rem;
   text-align: center;
   box-shadow: var(--shadow);
+  touch-action: none;
+  user-select: none;
 }
 
 .table-tile strong {
@@ -1597,6 +1608,51 @@ button.badge:disabled {
 .table-tile.occupied.unpaid {
   border-color: #fca5a5;
   background: var(--danger-bg);
+}
+
+.table-tile.joined {
+  outline: 2px dashed color-mix(in srgb, var(--accent, #f97316) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.table-tile.drop-target {
+  border-color: var(--accent, #f97316);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #f97316) 35%, transparent);
+  transform: scale(1.04);
+}
+
+.table-tile.dragging {
+  opacity: 0.45;
+}
+
+.table-ghost {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  min-width: 88px;
+  padding: 0.55rem 0.7rem;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent, #f97316);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  text-align: center;
+}
+
+.table-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.table-chip {
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
 }
 
 .pos-line.pending {

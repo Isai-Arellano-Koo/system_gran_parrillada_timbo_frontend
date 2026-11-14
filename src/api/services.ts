@@ -265,6 +265,18 @@ export const ordersApi = {
       token,
       body: { table_id, modality: "mesa" },
     }),
+  joinTables: (token: string, from_table_id: number, to_table_id: number) =>
+    apiRequest<Order>("/api/orders/join-tables", {
+      method: "POST",
+      token,
+      body: { from_table_id, to_table_id },
+    }),
+  splitTable: (token: string, table_id: number) =>
+    apiRequest<Order>("/api/orders/split-table", {
+      method: "POST",
+      token,
+      body: { table_id },
+    }),
   openDelivery: (
     token: string,
     body: {

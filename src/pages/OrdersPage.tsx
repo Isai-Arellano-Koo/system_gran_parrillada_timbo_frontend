@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail, TableItem } from "../types";
-import { dishLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
+import {
+  dishLabel,
+  kitchenStatusLabel,
+  orderCodeLabel,
+  tableNumbers,
+  tablesLabel,
+} from "../types";
 import { formatTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
 
@@ -104,13 +110,31 @@ export function OrdersPage() {
   const openByTable = useMemo(() => {
     const map = new Map<number, Order>();
     for (const order of orders) {
-      if (order.modality !== "mesa" || !order.table_id) continue;
-      if (order.status === "en_edicion" || order.status === "confirmado") {
-        map.set(order.table_id, order);
-      }
+      if (order.modality !== "mesa") continue;
+      if (order.status !== "en_edicion" && order.status !== "confirmado") continue;
+      const ids = (order.tables?.length
+        ? order.tables.map((table) => table.id)
+        : order.table_id
+          ? [order.table_id]
+          : []) as number[];
+      for (const id of ids) map.set(id, order);
     }
     return map;
   }, [orders]);
+
+  const pointer = useRef<{
+    tableId: number;
+    number: number;
+    startX: number;
+    startY: number;
+    dragging: boolean;
+    pointerId: number;
+  } | null>(null);
+  const overRef = useRef<number | null>(null);
+  const [ghost, setGhost] = useState<{ number: number; x: number; y: number } | null>(
+    null
+  );
+  const [overId, setOverId] = useState<number | null>(null);
 
   const visibleDishes = useMemo(() => {
     const list = dishes.filter((d) => d.is_active);
@@ -228,6 +252,90 @@ export function OrdersPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const joinTables = async (fromId: number, toId: number) => {
+    if (!token || fromId === toId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const order = await ordersApi.joinTables(token, fromId, toId);
+      setMessage(`${tablesLabel(order)} en un solo pedido`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudieron unir las mesas");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const splitJoinedTable = async (table: TableItem) => {
+    if (!token) return;
+    setBusy(true);
+    setError("");
+    try {
+      const order = await ordersApi.splitTable(token, table.id);
+      setMessage(`Mesa ${String(table.number).padStart(2, "0")} separada`);
+      await load(order.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo separar la mesa");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const tableFromPoint = (x: number, y: number) => {
+    const hit = document.elementFromPoint(x, y)?.closest("[data-table-id]");
+    if (!(hit instanceof HTMLElement)) return null;
+    const id = Number(hit.dataset.tableId);
+    return Number.isFinite(id) ? id : null;
+  };
+
+  const onTablePointerDown = (event: PointerEvent<HTMLButtonElement>, table: TableItem) => {
+    if (event.button !== 0) return;
+    pointer.current = {
+      tableId: table.id,
+      number: table.number,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      pointerId: event.pointerId,
+    };
+  };
+
+  const onTablePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const current = pointer.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    const dx = event.clientX - current.startX;
+    const dy = event.clientY - current.startY;
+    if (!current.dragging && dx * dx + dy * dy < 64) return;
+    if (!current.dragging) {
+      current.dragging = true;
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    }
+    setGhost({ number: current.number, x: event.clientX, y: event.clientY });
+    const hit = tableFromPoint(event.clientX, event.clientY);
+    const next = hit && hit !== current.tableId ? hit : null;
+    overRef.current = next;
+    setOverId(next);
+  };
+
+  const onTablePointerUp = async (
+    event: PointerEvent<HTMLButtonElement>,
+    table: TableItem
+  ) => {
+    const current = pointer.current;
+    pointer.current = null;
+    const targetId = overRef.current;
+    overRef.current = null;
+    setGhost(null);
+    setOverId(null);
+    if (!current || current.pointerId !== event.pointerId) return;
+    if (current.dragging) {
+      if (targetId) await joinTables(current.tableId, targetId);
+      return;
+    }
+    await pickTable(table);
   };
 
   const addDish = async (dish: Dish) => {
@@ -478,8 +586,8 @@ export function OrdersPage() {
           <div>
             <h1>Toma de pedidos</h1>
             <p>
-              Elige una mesa para abrir o seguir un pedido. Pensado para usar
-              desde tablet en el salón.
+              Toca una mesa para abrir el pedido. Arrastra una mesa sobre otra
+              para unirlas en un solo ticket.
             </p>
           </div>
         </div>
@@ -488,25 +596,52 @@ export function OrdersPage() {
 
         <section className="panel">
           <h2>Mesas</h2>
-          <div className="table-grid">
+          <p className="muted table-join-hint">
+            Arrastra Mesa 04 sobre Mesa 05, por ejemplo, y quedan juntas.
+          </p>
+          <div className={`table-grid${ghost ? " dragging" : ""}`}>
             {tables.map((table) => {
               const open = openByTable.get(table.id);
               const state = tableState(open);
+              const joined = open ? tableNumbers(open).length > 1 : false;
               return (
                 <button
                   key={table.id}
                   type="button"
-                  className={`table-tile ${state.className}`}
+                  data-table-id={table.id}
+                  className={`table-tile ${state.className}${
+                    joined ? " joined" : ""
+                  }${overId === table.id ? " drop-target" : ""}${
+                    ghost && table.number === ghost.number ? " dragging" : ""
+                  }`}
                   disabled={busy}
-                  onClick={() => pickTable(table)}
+                  onPointerDown={(event) => onTablePointerDown(event, table)}
+                  onPointerMove={onTablePointerMove}
+                  onPointerUp={(event) => onTablePointerUp(event, table)}
+                  onPointerCancel={(event) => onTablePointerUp(event, table)}
                 >
                   <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
-                  <span>{state.label}</span>
+                  <span>
+                    {joined
+                      ? `Con ${tableNumbers(open)
+                          .filter((n) => n !== table.number)
+                          .map((n) => String(n).padStart(2, "0"))
+                          .join(" + ")} · ${state.label}`
+                      : state.label}
+                  </span>
                   {open ? <em>{money(open.total)}</em> : null}
                 </button>
               );
             })}
           </div>
+          {ghost ? (
+            <div
+              className="table-ghost"
+              style={{ left: ghost.x, top: ghost.y }}
+            >
+              Mesa {String(ghost.number).padStart(2, "0")}
+            </div>
+          ) : null}
         </section>
       </div>
     );
@@ -524,13 +659,7 @@ export function OrdersPage() {
               Mesas
             </button>
             <div>
-              <h1>
-                Toma de pedido — Mesa{" "}
-                {String(activeOrder.table?.number ?? activeOrder.table_id).padStart(
-                  2,
-                  "0"
-                )}
-              </h1>
+              <h1>Toma de pedido — {tablesLabel(activeOrder)}</h1>
               <p>
                 {editing
                   ? "Selecciona platos para agregar al ticket"
@@ -657,14 +786,25 @@ export function OrdersPage() {
             <div>
               <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
               <p>
-                Mesa{" "}
-                {String(activeOrder.table?.number ?? activeOrder.table_id).padStart(
-                  2,
-                  "0"
-                )}{" "}
-                · {formatTime(activeOrder.created_at)} ·{" "}
+                {tablesLabel(activeOrder)} · {formatTime(activeOrder.created_at)} ·{" "}
                 {activeOrder.waiter?.name || user?.name || "Mesero"}
               </p>
+              {tableNumbers(activeOrder).length > 1 ? (
+                <div className="table-chips">
+                  {(activeOrder.tables || []).map((table) => (
+                    <button
+                      key={table.id}
+                      type="button"
+                      className="table-chip"
+                      title="Separar esta mesa del pedido"
+                      disabled={busy}
+                      onClick={() => splitJoinedTable(table)}
+                    >
+                      Mesa {String(table.number).padStart(2, "0")} ×
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="pos-ticket-head-actions">
               {activeOrder.kitchen_ticket ? (

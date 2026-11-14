@@ -3,7 +3,12 @@ import { useAuth } from "../context/AuthContext";
 import { kitchenApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { KitchenTicket, OrderDetail } from "../types";
-import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
+import {
+  attentionLabel,
+  kitchenStatusLabel,
+  orderCodeLabel,
+  tablesLabel,
+} from "../types";
 
 const FLOW: KitchenTicket["status"][] = [
   "pendiente",
@@ -129,7 +134,7 @@ export function KitchenPage() {
                   </strong>
                   <div className="muted">
                     {ticket.order?.modality === "mesa" || !ticket.order?.modality
-                      ? `Mesa ${ticket.order?.table?.number ?? "—"}`
+                      ? tablesLabel(ticket.order)
                       : `${attentionLabel(ticket.order.modality)} · ${
                           ticket.order.delivery_customer_name || "Sin nombre"
                         }`}{" "}

@@ -104,6 +104,28 @@ export function orderCodeLabel(order: {
   return code || `Pedido ${order.id || ""}`;
 }
 
+export function tableNumbers(order?: {
+  table_id?: number | null;
+  table?: { number?: number } | null;
+  tables?: { number?: number }[] | null;
+} | null) {
+  const numbers = (order?.tables || [])
+    .map((table) => Number(table.number))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (numbers.length) {
+    return [...new Set(numbers)].sort((a, b) => a - b);
+  }
+  const fallback = Number(order?.table?.number);
+  return Number.isFinite(fallback) && fallback > 0 ? [fallback] : [];
+}
+
+export function tablesLabel(order?: Parameters<typeof tableNumbers>[0]) {
+  const numbers = tableNumbers(order);
+  if (!numbers.length) return "Mesa";
+  const text = numbers.map((n) => String(n).padStart(2, "0")).join(" + ");
+  return numbers.length === 1 ? `Mesa ${text}` : `Mesas ${text}`;
+}
+
 export function attentionLabel(modality?: string) {
   if (modality === "delivery") return "Delivery";
   if (modality === "para_llevar") return "Para llevar";
@@ -174,6 +196,7 @@ export type Order = {
   closed_at?: string | null;
   created_at?: string;
   table?: TableItem | null;
+  tables?: TableItem[];
   waiter?: User;
   details?: OrderDetail[];
   kitchen_ticket?: KitchenTicket | null;
