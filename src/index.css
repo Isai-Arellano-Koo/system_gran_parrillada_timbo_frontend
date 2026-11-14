@@ -1621,6 +1621,12 @@ button.badge:disabled {
   transform: scale(1.04);
 }
 
+.table-tile.holding {
+  transform: scale(1.06);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 .table-tile.dragging {
   opacity: 0.45;
 }

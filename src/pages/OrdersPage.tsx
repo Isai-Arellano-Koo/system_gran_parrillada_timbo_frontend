@@ -77,6 +77,8 @@ function lineTotal(detail: OrderDetail) {
   return Number(detail.unit_price) * Number(detail.quantity);
 }
 
+const TABLE_HOLD_MS = 450;
+
 function isSentToKitchen(detail: OrderDetail) {
   return detail.sent_to_kitchen === true;
 }
@@ -128,13 +130,17 @@ export function OrdersPage() {
     startX: number;
     startY: number;
     dragging: boolean;
+    armed: boolean;
     pointerId: number;
+    pointerType: string;
   } | null>(null);
+  const holdTimer = useRef<number | null>(null);
   const overRef = useRef<number | null>(null);
   const [ghost, setGhost] = useState<{ number: number; x: number; y: number } | null>(
     null
   );
   const [overId, setOverId] = useState<number | null>(null);
+  const [holdingId, setHoldingId] = useState<number | null>(null);
 
   const visibleDishes = useMemo(() => {
     const list = dishes.filter((d) => d.is_active);
@@ -194,6 +200,13 @@ export function OrdersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useEffect(
+    () => () => {
+      if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (activeOrder) setTicketOpen(true);
@@ -291,16 +304,47 @@ export function OrdersPage() {
     return Number.isFinite(id) ? id : null;
   };
 
+  const clearHoldTimer = () => {
+    if (holdTimer.current != null) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  const armDrag = (target: HTMLElement, pointerId: number) => {
+    const current = pointer.current;
+    if (!current || current.pointerId !== pointerId || current.armed) return;
+    current.armed = true;
+    setHoldingId(current.tableId);
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {
+      /* el pointer ya no está activo */
+    }
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(12);
+    }
+  };
+
   const onTablePointerDown = (event: PointerEvent<HTMLButtonElement>, table: TableItem) => {
     if (event.button !== 0) return;
+    clearHoldTimer();
+    const needsHold = event.pointerType === "touch";
     pointer.current = {
       tableId: table.id,
       number: table.number,
       startX: event.clientX,
       startY: event.clientY,
       dragging: false,
+      armed: !needsHold,
       pointerId: event.pointerId,
+      pointerType: event.pointerType,
     };
+    if (needsHold) {
+      const target = event.currentTarget;
+      const pointerId = event.pointerId;
+      holdTimer.current = window.setTimeout(() => armDrag(target, pointerId), TABLE_HOLD_MS);
+    }
   };
 
   const onTablePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
@@ -308,10 +352,19 @@ export function OrdersPage() {
     if (!current || current.pointerId !== event.pointerId) return;
     const dx = event.clientX - current.startX;
     const dy = event.clientY - current.startY;
+    if (!current.armed) {
+      if (dx * dx + dy * dy > 100) clearHoldTimer();
+      return;
+    }
     if (!current.dragging && dx * dx + dy * dy < 64) return;
     if (!current.dragging) {
       current.dragging = true;
-      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+      setHoldingId(null);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* ya capturado al dejar presionado */
+      }
     }
     setGhost({ number: current.number, x: event.clientX, y: event.clientY });
     const hit = tableFromPoint(event.clientX, event.clientY);
@@ -324,17 +377,20 @@ export function OrdersPage() {
     event: PointerEvent<HTMLButtonElement>,
     table: TableItem
   ) => {
+    clearHoldTimer();
     const current = pointer.current;
     pointer.current = null;
     const targetId = overRef.current;
     overRef.current = null;
     setGhost(null);
     setOverId(null);
+    setHoldingId(null);
     if (!current || current.pointerId !== event.pointerId) return;
     if (current.dragging) {
       if (targetId) await joinTables(current.tableId, targetId);
       return;
     }
+    if (current.pointerType === "touch" && current.armed) return;
     await pickTable(table);
   };
 
@@ -586,8 +642,8 @@ export function OrdersPage() {
           <div>
             <h1>Toma de pedidos</h1>
             <p>
-              Toca una mesa para abrir el pedido. Arrastra una mesa sobre otra
-              para unirlas en un solo ticket.
+              Toca una mesa para abrir el pedido. En el celular, deja presionada
+              una mesa un momento y luego arrástrala sobre otra para unirlas.
             </p>
           </div>
         </div>
@@ -597,7 +653,8 @@ export function OrdersPage() {
         <section className="panel">
           <h2>Mesas</h2>
           <p className="muted table-join-hint">
-            Arrastra Mesa 04 sobre Mesa 05, por ejemplo, y quedan juntas.
+            En el celular: deja presionado y suelta sobre la otra mesa. En
+            computadora puedes arrastrar directo.
           </p>
           <div className={`table-grid${ghost ? " dragging" : ""}`}>
             {tables.map((table) => {
@@ -612,6 +669,8 @@ export function OrdersPage() {
                   className={`table-tile ${state.className}${
                     joined ? " joined" : ""
                   }${overId === table.id ? " drop-target" : ""}${
+                    holdingId === table.id ? " holding" : ""
+                  }${
                     ghost && table.number === ghost.number ? " dragging" : ""
                   }`}
                   disabled={busy}
@@ -619,6 +678,7 @@ export function OrdersPage() {
                   onPointerMove={onTablePointerMove}
                   onPointerUp={(event) => onTablePointerUp(event, table)}
                   onPointerCancel={(event) => onTablePointerUp(event, table)}
+                  onContextMenu={(event) => event.preventDefault()}
                 >
                   <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
                   <span>
