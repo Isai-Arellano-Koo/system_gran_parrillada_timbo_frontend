@@ -1569,6 +1569,19 @@ button.badge:disabled {
   margin: 0.15rem 0 0.75rem;
 }
 
+.table-join-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-elevated));
+  border: 1px solid var(--accent);
+  font-weight: 600;
+}
+
 .table-grid.joining {
   user-select: none;
 }
@@ -1584,15 +1597,9 @@ button.badge:disabled {
   padding: 0.85rem 0.6rem;
   text-align: center;
   box-shadow: var(--shadow);
-  touch-action: pan-y manipulation;
+  touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
-}
-
-.table-tile.holding,
-.table-tile.dragging,
-.table-grid.joining .table-tile {
-  touch-action: none;
 }
 
 .table-tile strong {

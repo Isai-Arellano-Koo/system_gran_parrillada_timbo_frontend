@@ -137,11 +137,18 @@ export function OrdersPage() {
   } | null>(null);
   const holdTimer = useRef<number | null>(null);
   const overRef = useRef<number | null>(null);
+  const joinSourceRef = useRef<number | null>(null);
+  const nativeTouch = useRef<{
+    move: (event: TouchEvent) => void;
+    end: (event: TouchEvent) => void;
+    cancel: () => void;
+  } | null>(null);
   const [ghost, setGhost] = useState<{ number: number; x: number; y: number } | null>(
     null
   );
   const [overId, setOverId] = useState<number | null>(null);
   const [holdingId, setHoldingId] = useState<number | null>(null);
+  const [joinSource, setJoinSource] = useState<number | null>(null);
 
   const visibleDishes = useMemo(() => {
     const list = dishes.filter((d) => d.is_active);
@@ -205,6 +212,11 @@ export function OrdersPage() {
   useEffect(
     () => () => {
       if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
+      if (nativeTouch.current) {
+        document.removeEventListener("touchmove", nativeTouch.current.move);
+        document.removeEventListener("touchend", nativeTouch.current.end);
+        document.removeEventListener("touchcancel", nativeTouch.current.cancel);
+      }
     },
     []
   );
@@ -312,19 +324,89 @@ export function OrdersPage() {
     }
   };
 
-  const armDrag = (target: HTMLElement, pointerId: number) => {
+  const detachTouch = () => {
+    if (!nativeTouch.current) return;
+    document.removeEventListener("touchmove", nativeTouch.current.move);
+    document.removeEventListener("touchend", nativeTouch.current.end);
+    document.removeEventListener("touchcancel", nativeTouch.current.cancel);
+    nativeTouch.current = null;
+  };
+
+  const setJoinFrom = (tableId: number | null) => {
+    joinSourceRef.current = tableId;
+    setJoinSource(tableId);
+    setHoldingId(tableId);
+  };
+
+  const updateDragAt = (x: number, y: number) => {
     const current = pointer.current;
-    if (!current || current.pointerId !== pointerId || current.armed) return;
+    if (!current?.armed) return;
+    const dx = x - current.startX;
+    const dy = y - current.startY;
+    if (!current.dragging && dx * dx + dy * dy < 64) return;
+    current.dragging = true;
+    setGhost({ number: current.number, x, y });
+    const hit = tableFromPoint(x, y);
+    const next = hit && hit !== current.tableId ? hit : null;
+    overRef.current = next;
+    setOverId(next);
+  };
+
+  const armDrag = () => {
+    const current = pointer.current;
+    if (!current || current.armed || current.cancelled) return;
     current.armed = true;
-    setHoldingId(current.tableId);
-    try {
-      target.setPointerCapture(pointerId);
-    } catch {
-      /* el pointer ya no está activo */
-    }
+    setJoinFrom(current.tableId);
+    setMessage("Toca otra mesa para unirla");
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(12);
     }
+  };
+
+  const finishTableGesture = async (table: TableItem, fromCancel = false) => {
+    const current = pointer.current;
+    const targetId = overRef.current;
+    const source = joinSourceRef.current;
+    pointer.current = null;
+    detachTouch();
+    clearHoldTimer();
+    overRef.current = null;
+    setGhost(null);
+    setOverId(null);
+    if (fromCancel) return;
+    if (!current) {
+      if (source != null) {
+        if (source === table.id) {
+          setJoinFrom(null);
+          setMessage("");
+          return;
+        }
+        await joinTables(source, table.id);
+        setJoinFrom(null);
+      }
+      return;
+    }
+    if (current.cancelled) return;
+    if (current.dragging) {
+      setJoinFrom(null);
+      if (targetId) await joinTables(current.tableId, targetId);
+      return;
+    }
+    if (current.pointerType === "touch" && current.armed) {
+      setJoinFrom(current.tableId);
+      return;
+    }
+    if (source != null && source !== table.id) {
+      await joinTables(source, table.id);
+      setJoinFrom(null);
+      return;
+    }
+    if (source === table.id) {
+      setJoinFrom(null);
+      setMessage("");
+      return;
+    }
+    await pickTable(table);
   };
 
   const onTablePointerDown = (event: PointerEvent<HTMLButtonElement>, table: TableItem) => {
@@ -342,74 +424,81 @@ export function OrdersPage() {
       pointerId: event.pointerId,
       pointerType: event.pointerType,
     };
-    if (needsHold) {
-      const target = event.currentTarget;
-      const pointerId = event.pointerId;
-      holdTimer.current = window.setTimeout(() => armDrag(target, pointerId), TABLE_HOLD_MS);
+    if (!needsHold) return;
+    if (joinSourceRef.current == null) {
+      holdTimer.current = window.setTimeout(() => armDrag(), TABLE_HOLD_MS);
     }
+    detachTouch();
+    const move = (touchEvent: TouchEvent) => {
+      const current = pointer.current;
+      const touch = touchEvent.touches[0];
+      if (!current || !touch) return;
+      const dx = touch.clientX - current.startX;
+      const dy = touch.clientY - current.startY;
+      if (!current.armed) {
+        if (dx * dx + dy * dy > 64) {
+          current.cancelled = true;
+          clearHoldTimer();
+        }
+        return;
+      }
+      touchEvent.preventDefault();
+      updateDragAt(touch.clientX, touch.clientY);
+    };
+    const end = () => {
+      void finishTableGesture(table);
+    };
+    const cancel = () => {
+      const current = pointer.current;
+      detachTouch();
+      clearHoldTimer();
+      setGhost(null);
+      setOverId(null);
+      if (current && !current.armed) {
+        current.cancelled = true;
+        pointer.current = null;
+      }
+    };
+    nativeTouch.current = { move, end, cancel };
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", end);
+    document.addEventListener("touchcancel", cancel);
   };
 
   const onTablePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
     const current = pointer.current;
     if (!current || current.pointerId !== event.pointerId) return;
+    if (current.pointerType === "touch") return;
     const dx = event.clientX - current.startX;
     const dy = event.clientY - current.startY;
-    if (!current.armed) {
-      if (dx * dx + dy * dy > 64) {
-        current.cancelled = true;
-        clearHoldTimer();
-      }
-      return;
-    }
     if (!current.dragging && dx * dx + dy * dy < 64) return;
     if (!current.dragging) {
       current.dragging = true;
-      setHoldingId(null);
       try {
         event.currentTarget.setPointerCapture(event.pointerId);
       } catch {
-        /* ya capturado al dejar presionado */
+        /* captura no disponible */
       }
     }
-    setGhost({ number: current.number, x: event.clientX, y: event.clientY });
-    const hit = tableFromPoint(event.clientX, event.clientY);
-    const next = hit && hit !== current.tableId ? hit : null;
-    overRef.current = next;
-    setOverId(next);
+    updateDragAt(event.clientX, event.clientY);
   };
 
-  const endTableGesture = () => {
+  const onTablePointerCancel = () => {
+    const current = pointer.current;
+    detachTouch();
     clearHoldTimer();
-    overRef.current = null;
     setGhost(null);
     setOverId(null);
-    setHoldingId(null);
-  };
-
-  const onTablePointerCancel = (event: PointerEvent<HTMLButtonElement>) => {
-    const current = pointer.current;
-    if (current && current.pointerId === event.pointerId) {
-      pointer.current = null;
-    }
-    endTableGesture();
+    if (current?.armed) return;
+    pointer.current = null;
   };
 
   const onTablePointerUp = async (
     event: PointerEvent<HTMLButtonElement>,
     table: TableItem
   ) => {
-    const current = pointer.current;
-    const targetId = overRef.current;
-    pointer.current = null;
-    endTableGesture();
-    if (!current || current.pointerId !== event.pointerId) return;
-    if (current.cancelled) return;
-    if (current.dragging) {
-      if (targetId) await joinTables(current.tableId, targetId);
-      return;
-    }
-    if (current.pointerType === "touch" && current.armed) return;
-    await pickTable(table);
+    if (pointer.current?.pointerType === "touch") return;
+    await finishTableGesture(table);
   };
 
   const addDish = async (dish: Dish) => {
@@ -661,7 +750,7 @@ export function OrdersPage() {
             <h1>Toma de pedidos</h1>
             <p>
               Toca una mesa para abrir el pedido. En el celular, deja presionada
-              una mesa un momento y luego arrástrala sobre otra para unirlas.
+              una mesa y luego toca otra para unirlas.
             </p>
           </div>
         </div>
@@ -671,10 +760,35 @@ export function OrdersPage() {
         <section className="panel">
           <h2>Mesas</h2>
           <p className="muted table-join-hint">
-            En el celular: deja presionado y suelta sobre la otra mesa. En
-            computadora puedes arrastrar directo.
+            Celular o tablet: deja presionada una mesa y toca la otra. En
+            computadora puedes arrastrar una sobre otra.
           </p>
-          <div className={`table-grid${ghost || holdingId ? " joining" : ""}`}>
+          {joinSource != null ? (
+            <div className="table-join-banner">
+              <span>
+                Mesa{" "}
+                {String(
+                  tables.find((item) => item.id === joinSource)?.number ?? ""
+                ).padStart(2, "0")}{" "}
+                lista. Toca otra mesa para unirla.
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setJoinFrom(null);
+                  setMessage("");
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : null}
+          <div
+            className={`table-grid${
+              ghost || holdingId || joinSource != null ? " joining" : ""
+            }`}
+          >
             {tables.map((table) => {
               const open = openByTable.get(table.id);
               const state = tableState(open);
@@ -687,7 +801,9 @@ export function OrdersPage() {
                   className={`table-tile ${state.className}${
                     joined ? " joined" : ""
                   }${overId === table.id ? " drop-target" : ""}${
-                    holdingId === table.id ? " holding" : ""
+                    holdingId === table.id || joinSource === table.id
+                      ? " holding"
+                      : ""
                   }${
                     ghost && table.number === ghost.number ? " dragging" : ""
                   }`}
