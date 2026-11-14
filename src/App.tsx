@@ -11,6 +11,7 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { DishRecipePage } from "./pages/DishRecipePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
+import { TablesPage } from "./pages/TablesPage";
 import { DeliveryOrdersPage } from "./pages/DeliveryOrdersPage";
 import { SoldDishesPage } from "./pages/SoldDishesPage";
 import { KitchenPage } from "./pages/KitchenPage";
@@ -42,6 +43,7 @@ export default function App() {
                 <Route path="/users/historial" element={<UsersHistoryPage />} />
                 <Route path="/users/nuevo" element={<UserFormPage />} />
                 <Route path="/users/:id" element={<UserFormPage />} />
+                <Route path="/tables" element={<TablesPage />} />
               </Route>
               <Route
                 element={<ProtectedRoute roles={["admin", "mesero"]} />}

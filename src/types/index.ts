@@ -137,6 +137,19 @@ export type TableItem = {
   number: number;
   capacity?: number | null;
   is_active: boolean;
+  group_id?: number | null;
+  group_numbers?: number[];
+  occupied?: boolean;
+};
+
+export type TableChange = {
+  id: string;
+  kind: "disponibilidad" | "agrupacion";
+  at?: string | Date | null;
+  table_number?: number | null;
+  detail: string;
+  reason?: string;
+  user_name: string;
 };
 
 export type OrderDetail = {

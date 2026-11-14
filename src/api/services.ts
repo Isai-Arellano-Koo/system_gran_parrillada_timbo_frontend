@@ -11,6 +11,7 @@ import type {
   Order,
   SoldDish,
   StockAlert,
+  TableChange,
   TableItem,
   User,
   UserStatusChange,
@@ -245,6 +246,32 @@ export const inventoryApi = {
 export const ordersApi = {
   listTables: (token: string) =>
     apiRequest<TableItem[]>("/api/orders/tables", { token }),
+  setTableActive: (
+    token: string,
+    tableId: number,
+    is_active: boolean,
+    reason: string
+  ) =>
+    apiRequest<TableItem>(`/api/orders/tables/${tableId}`, {
+      method: "PATCH",
+      token,
+      body: { is_active, reason },
+    }),
+  groupTables: (token: string, table_ids: number[]) =>
+    apiRequest<TableItem[]>("/api/orders/tables/groups", {
+      method: "POST",
+      token,
+      body: { table_ids },
+    }),
+  ungroupTables: (token: string, groupId: number) =>
+    apiRequest<TableItem[]>(`/api/orders/tables/groups/${groupId}`, {
+      method: "DELETE",
+      token,
+    }),
+  tableChanges: (token: string) =>
+    apiRequest<TableChange[]>("/api/orders/tables/changes", {
+      token,
+    }),
   seedTables: (token: string) =>
     apiRequest<TableItem[]>("/api/orders/tables/seed", {
       method: "POST",

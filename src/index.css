@@ -1586,6 +1586,45 @@ button.badge:disabled {
   user-select: none;
 }
 
+.table-tile.inactive {
+  opacity: 0.58;
+}
+
+.admin-table {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.admin-table-hit {
+  display: grid;
+  place-content: center;
+  gap: 0.2rem;
+  min-height: 88px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.7rem 0.5rem 0.35rem;
+  text-align: center;
+}
+
+.admin-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  padding: 0.35rem 0.4rem 0.55rem;
+}
+
+.admin-table-actions .btn {
+  min-height: 32px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+}
+
 .table-tile {
   min-height: 96px;
   border: 1px solid var(--line);

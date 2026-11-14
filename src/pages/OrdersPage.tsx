@@ -295,21 +295,6 @@ export function OrdersPage() {
     }
   };
 
-  const splitJoinedTable = async (table: TableItem) => {
-    if (!token) return;
-    setBusy(true);
-    setError("");
-    try {
-      const order = await ordersApi.splitTable(token, table.id);
-      setMessage(`Mesa ${String(table.number).padStart(2, "0")} separada`);
-      await load(order.id);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo separar la mesa");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const tableFromPoint = (x: number, y: number) => {
     const hit = document.elementFromPoint(x, y)?.closest("[data-table-id]");
     if (!(hit instanceof HTMLElement)) return null;
@@ -493,10 +478,7 @@ export function OrdersPage() {
     pointer.current = null;
   };
 
-  const onTablePointerUp = async (
-    event: PointerEvent<HTMLButtonElement>,
-    table: TableItem
-  ) => {
+  const onTablePointerUp = async (table: TableItem) => {
     if (pointer.current?.pointerType === "touch") return;
     await finishTableGesture(table);
   };
@@ -792,7 +774,9 @@ export function OrdersPage() {
             {tables.map((table) => {
               const open = openByTable.get(table.id);
               const state = tableState(open);
-              const joined = open ? tableNumbers(open).length > 1 : false;
+              const joined =
+                (table.group_numbers?.length || 0) > 1 ||
+                (open ? tableNumbers(open).length > 1 : false);
               return (
                 <button
                   key={table.id}
@@ -810,14 +794,18 @@ export function OrdersPage() {
                   disabled={busy}
                   onPointerDown={(event) => onTablePointerDown(event, table)}
                   onPointerMove={onTablePointerMove}
-                  onPointerUp={(event) => onTablePointerUp(event, table)}
+                  onPointerUp={() => onTablePointerUp(table)}
                   onPointerCancel={onTablePointerCancel}
                   onContextMenu={(event) => event.preventDefault()}
                 >
                   <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
                   <span>
                     {joined
-                      ? `Con ${tableNumbers(open)
+                      ? `Con ${(
+                          open
+                            ? tableNumbers(open)
+                            : table.group_numbers || []
+                        )
                           .filter((n) => n !== table.number)
                           .map((n) => String(n).padStart(2, "0"))
                           .join(" + ")} · ${state.label}`
@@ -986,16 +974,9 @@ export function OrdersPage() {
               {tableNumbers(activeOrder).length > 1 ? (
                 <div className="table-chips">
                   {(activeOrder.tables || []).map((table) => (
-                    <button
-                      key={table.id}
-                      type="button"
-                      className="table-chip"
-                      title="Separar esta mesa del pedido"
-                      disabled={busy}
-                      onClick={() => splitJoinedTable(table)}
-                    >
-                      Mesa {String(table.number).padStart(2, "0")} ×
-                    </button>
+                    <span key={table.id} className="table-chip">
+                      Mesa {String(table.number).padStart(2, "0")}
+                    </span>
                   ))}
                 </div>
               ) : null}
