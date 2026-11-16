@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
@@ -137,9 +137,10 @@ export function DeliveryOrdersPage() {
     const id = keepId ?? activeOrder?.id;
     if (id) {
       const refreshed =
+        (await ordersApi.get(token, id).catch(() => null)) ||
         orderList.find((o) => o.id === id) ||
-        (await ordersApi.get(token, id).catch(() => null));
-      setActiveOrder(refreshed || null);
+        null;
+      setActiveOrder(refreshed);
       const nextNotes: Record<number, string> = {};
       for (const detail of refreshed?.details || []) {
         nextNotes[detail.id] = detail.observation || "";
@@ -154,8 +155,10 @@ export function DeliveryOrdersPage() {
     );
   }, [token]);
 
+  const liveOrderId = useRef(activeOrder?.id);
+  liveOrderId.current = activeOrder?.id;
   useLiveReload(["orders", "catalog", "kitchen"], () => {
-    load().catch(() => undefined);
+    load(liveOrderId.current).catch(() => undefined);
   });
 
   useEffect(() => {

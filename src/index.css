@@ -2060,13 +2060,13 @@ tr.st-band td:first-child {
 
 .table-tile.occupied,
 .table-tile.st-band {
-  border-color: color-mix(in srgb, var(--st) 50%, var(--line));
-  background: var(--st-bg);
-  box-shadow: inset 6px 0 0 var(--st), var(--shadow);
+  background: var(--bg-elevated);
+  border-color: var(--line);
+  box-shadow: inset 8px 0 0 var(--st), var(--shadow);
 }
 
 .table-tile.st-unpaid {
-  box-shadow: inset 6px 0 0 var(--st), inset 0 5px 0 var(--st-unpaid), var(--shadow);
+  box-shadow: inset 8px 0 0 var(--st), inset 0 5px 0 var(--st-unpaid), var(--shadow);
 }
 
 .table-tile.joined {

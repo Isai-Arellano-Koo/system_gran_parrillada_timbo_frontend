@@ -25,12 +25,14 @@ export type LiveEvent = {
 };
 
 type LiveContextValue = {
-  last: LiveEvent | null;
+  version: number;
+  events: LiveEvent[];
   connected: boolean;
 };
 
 const LiveContext = createContext<LiveContextValue>({
-  last: null,
+  version: 0,
+  events: [],
   connected: false,
 });
 
@@ -56,7 +58,8 @@ function parseSseChunk(chunk: string, onEvent: (scope: LiveScope, at: string) =>
 
 export function LiveProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
-  const [last, setLast] = useState<LiveEvent | null>(null);
+  const [version, setVersion] = useState(0);
+  const [events, setEvents] = useState<LiveEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const seq = useRef(0);
 
@@ -92,12 +95,19 @@ export function LiveProvider({ children }: { children: ReactNode }) {
           buffer += decoder.decode(value, { stream: true });
           const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
+          const incoming: LiveEvent[] = [];
           for (const part of parts) {
             parseSseChunk(part, (scope, at) => {
               seq.current += 1;
-              setLast({ id: seq.current, scope, at });
+              incoming.push({ id: seq.current, scope, at });
             });
           }
+          if (!incoming.length) continue;
+          setEvents((prev) => {
+            const next = [...prev, ...incoming];
+            return next.length > 80 ? next.slice(-80) : next;
+          });
+          setVersion(seq.current);
         }
         setConnected(false);
       } catch {
@@ -119,7 +129,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   return (
-    <LiveContext.Provider value={{ last, connected }}>
+    <LiveContext.Provider value={{ version, events, connected }}>
       {children}
     </LiveContext.Provider>
   );
@@ -130,17 +140,20 @@ export function useLive() {
 }
 
 export function useLiveReload(scopes: LiveScope[], reload: () => void) {
-  const { last } = useLive();
+  const { version, events } = useLive();
   const reloadRef = useRef(reload);
   reloadRef.current = reload;
+  const seenRef = useRef(version);
   const scopesKey = scopes.join(",");
 
   useEffect(() => {
-    if (!last) return;
-    if (!scopes.includes(last.scope)) return;
+    const unread = events.filter((event) => event.id > seenRef.current);
+    seenRef.current = version;
+    const wanted = scopesKey.split(",") as LiveScope[];
+    if (!unread.some((event) => wanted.includes(event.scope))) return;
     const timer = window.setTimeout(() => {
       reloadRef.current();
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [last, scopesKey]);
+  }, [version, events, scopesKey]);
 }

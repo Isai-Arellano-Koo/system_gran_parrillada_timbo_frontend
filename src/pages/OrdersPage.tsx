@@ -177,9 +177,10 @@ export function OrdersPage() {
     const id = keepId ?? activeOrder?.id;
     if (id) {
       const refreshed =
+        (await ordersApi.get(token, id).catch(() => null)) ||
         orderList.find((o) => o.id === id) ||
-        (await ordersApi.get(token, id).catch(() => null));
-      setActiveOrder(refreshed || null);
+        null;
+      setActiveOrder(refreshed);
       const nextNotes: Record<number, string> = {};
       for (const detail of refreshed?.details || []) {
         nextNotes[detail.id] = detail.observation || "";
