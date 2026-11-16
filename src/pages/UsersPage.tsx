@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { usersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { ROLE_OPTIONS, roleAvatar, roleLabel } from "../constants/roles";
 import type { User, UserRole } from "../types";
 
@@ -30,6 +31,10 @@ export function UsersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar usuarios")
     );
   }, [token]);
+
+  useLiveReload(["users"], () => {
+    load().catch(() => undefined);
+  });
 
   const openStatusDialog = (item: User) => {
     setError("");

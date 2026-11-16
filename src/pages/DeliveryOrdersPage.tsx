@@ -7,6 +7,15 @@ import type { Category, Dish, Order, OrderDetail } from "../types";
 import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
 import { formatTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
+import { useLiveReload } from "../context/LiveContext";
+import { StatusLegend } from "../components/StatusLegend";
+import {
+  isUnpaid,
+  kitchenTone,
+  orderTone,
+  orderToneLabel,
+  toneClass,
+} from "../helpers/orderStatus";
 
 type Shortage = {
   name: string;
@@ -31,18 +40,12 @@ function isSentToKitchen(detail: OrderDetail) {
   return detail.sent_to_kitchen === true;
 }
 
-function statusLabel(status: Order["status"]) {
-  if (status === "en_edicion") return "En edición";
-  if (status === "confirmado") return "En curso";
-  if (status === "cerrado") return "Cerrado";
-  return "Cancelado";
+function statusLabel(order: Order) {
+  return orderToneLabel(orderTone(order), order.modality);
 }
 
-function statusClass(status: Order["status"]) {
-  if (status === "en_edicion") return "badge-edit";
-  if (status === "confirmado") return "badge-ok";
-  if (status === "cerrado") return "badge-ok";
-  return "badge-danger";
+function statusClass(order: Order) {
+  return toneClass(orderTone(order), isUnpaid(order));
 }
 
 export function DeliveryOrdersPage() {
@@ -150,6 +153,10 @@ export function DeliveryOrdersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["orders", "catalog", "kitchen"], () => {
+    load().catch(() => undefined);
+  });
 
   useEffect(() => {
     if (activeOrder) setTicketOpen(true);
@@ -333,7 +340,12 @@ export function DeliveryOrdersPage() {
     const canChangeQty = canEditItems && !sentLine;
     const alerts = shortages.filter((item) => item.dishes.includes(detail.dish?.name || ""));
     return (
-      <article key={detail.id} className="pos-line">
+      <article
+        key={detail.id}
+        className={`pos-line${
+          sentLine ? ` st-band ${toneClass(kitchenTone(detail.kitchen_status))}` : ""
+        }`}
+      >
         <div className="pos-line-main">
           <div>
             <strong>{detail.dish?.name || `Plato ${detail.dish_id}`}</strong>
@@ -409,6 +421,7 @@ export function DeliveryOrdersPage() {
               Pedidos sin mesa. Elige Delivery o Para llevar, agrégale platos y
               confírmalo. Cocina ve el tipo y el inventario se descuenta igual.
             </p>
+            <StatusLegend variant="delivery" />
           </div>
           <div className="actions">
             <button
@@ -461,7 +474,10 @@ export function DeliveryOrdersPage() {
               </thead>
               <tbody>
                 {(showHistory ? historyOrders : openOrders).map((order) => (
-                  <tr key={order.id}>
+                  <tr
+                    key={order.id}
+                    className={`st-band ${statusClass(order)}`}
+                  >
                     <td>
                       <strong>{orderCodeLabel(order)}</strong>
                       <div className="hint">{formatTime(order.created_at)}</div>
@@ -470,8 +486,8 @@ export function DeliveryOrdersPage() {
                     <td>{order.delivery_customer_name || "—"}</td>
                     <td>{order.delivery_phone || "—"}</td>
                     <td>
-                      <span className={`badge ${statusClass(order.status)}`}>
-                        {statusLabel(order.status)}
+                      <span className={`badge ${statusClass(order)}`}>
+                        {statusLabel(order)}
                       </span>
                     </td>
                     <td>{money(order.total)}</td>
@@ -622,8 +638,8 @@ export function DeliveryOrdersPage() {
                 {activeOrder.delivery_phone ? ` · ${activeOrder.delivery_phone}` : ""}
               </p>
             </div>
-            <span className={`badge ${statusClass(activeOrder.status)}`}>
-              {statusLabel(activeOrder.status)}
+            <span className={`badge ${statusClass(activeOrder)}`}>
+              {statusLabel(activeOrder)}
             </span>
             <button
               type="button"
@@ -697,7 +713,9 @@ export function DeliveryOrdersPage() {
             aria-label="Cerrar pedido"
             onClick={() => setTicketOpen(false)}
           />
-          <aside className="pos-ticket">
+          <aside
+            className={`pos-ticket st-band ${statusClass(activeOrder)}`}
+          >
             <div className="pos-ticket-head">
               <div>
                 <h2>Pedido {orderCodeLabel(activeOrder)}</h2>

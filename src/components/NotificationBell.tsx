@@ -11,6 +11,7 @@ import {
   playReadyChime,
   unlockNotifySound,
 } from "../helpers/notifySound";
+import { useLiveReload } from "../context/LiveContext";
 
 const empty: WaiterNotificationList = {
   pending: [],
@@ -81,11 +82,12 @@ export function NotificationBell() {
       return;
     }
     refresh(false).catch(() => undefined);
-    const timer = window.setInterval(() => {
-      refresh(true).catch(() => undefined);
-    }, 4000);
-    return () => window.clearInterval(timer);
   }, [token, canSee]);
+
+  useLiveReload(["notifications"], () => {
+    if (!canSee) return;
+    refresh(true).catch(() => undefined);
+  });
 
   useEffect(() => {
     if (!toast) return;
@@ -186,7 +188,12 @@ export function NotificationBell() {
               </p>
             ) : (
               items.map((item) => (
-                <article key={item.id} className="notify-card">
+                <article
+                  key={item.id}
+                  className={`notify-card st-band ${
+                    item.attended_at ? "st st-dining" : "st st-ready"
+                  }`}
+                >
                   <div className="notify-card-top">
                     <div>
                       <strong>{item.dish_label || orderTitle(item)}</strong>

@@ -14,6 +14,16 @@ import {
 } from "../types";
 import { formatTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
+import { useLiveReload } from "../context/LiveContext";
+import { StatusLegend } from "../components/StatusLegend";
+import {
+  dueOf as orderDue,
+  isUnpaid,
+  kitchenTone,
+  orderTone,
+  orderToneLabel,
+  toneClass,
+} from "../helpers/orderStatus";
 
 type Shortage = {
   name: string;
@@ -26,22 +36,8 @@ function money(value: number | string) {
   return `S/ ${Number(value).toFixed(2)}`;
 }
 
-function statusLabel(status: Order["status"]) {
-  if (status === "en_edicion") return "En edición";
-  if (status === "confirmado") return "En mesa";
-  if (status === "cerrado") return "Cerrado";
-  return "Cancelado";
-}
-
-function statusClass(status: Order["status"]) {
-  if (status === "en_edicion") return "badge-edit";
-  if (status === "confirmado") return "badge-ok";
-  if (status === "cerrado") return "badge-ok";
-  return "badge-danger";
-}
-
 function dueOf(order: Order) {
-  return Math.max(0, Number(order.total) - Number(order.amount_paid || 0));
+  return orderDue(order);
 }
 
 function isSettled(order: Order) {
@@ -49,28 +45,14 @@ function isSettled(order: Order) {
 }
 
 function tableState(order?: Order) {
-  if (!order) return { label: "Libre", className: "" };
-  if (order.status === "en_edicion") {
-    return { label: "En edición", className: "occupied" };
-  }
-  const due = dueOf(order);
-  const unpaid = due > 0.009 ? " · Sin pagar" : " · Pagado";
-  const kitchen = order.kitchen_ticket?.status;
-  if (kitchen === "entregado") {
-    return {
-      label: `En mesa${unpaid}`,
-      className: `occupied dining${due > 0.009 ? " unpaid" : ""}`,
-    };
-  }
-  if (kitchen === "listo") {
-    return {
-      label: `Por entregar${unpaid}`,
-      className: `occupied ready${due > 0.009 ? " unpaid" : ""}`,
-    };
-  }
+  const tone = orderTone(order);
+  const unpaid = isUnpaid(order);
+  const label = orderToneLabel(tone, order?.modality);
+  if (!order) return { label, className: `st-band ${toneClass(tone)}` };
+  const pay = order.status === "confirmado" ? (unpaid ? " · Sin pagar" : " · Pagado") : "";
   return {
-    label: `En cocina${unpaid}`,
-    className: `occupied kitchen${due > 0.009 ? " unpaid" : ""}`,
+    label: `${label}${pay}`,
+    className: `occupied st-band ${toneClass(tone, unpaid)}`,
   };
 }
 
@@ -211,6 +193,12 @@ export function OrdersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  const liveOrderId = useRef(activeOrder?.id);
+  liveOrderId.current = activeOrder?.id;
+  useLiveReload(["orders", "tables", "catalog", "kitchen"], () => {
+    load(liveOrderId.current).catch(() => undefined);
+  });
 
   useEffect(() => {
     if (!token || !wantedOrder) return;
@@ -679,6 +667,10 @@ export function OrdersPage() {
         key={detail.id}
         className={`pos-line ${alerts.length ? "warn" : ""} ${
           canChangeQty && !editing ? "pending" : ""
+        }${
+          sentLine
+            ? ` st-band ${toneClass(kitchenTone(detail.kitchen_status))}`
+            : ""
         }`}
       >
         <div className="pos-line-top">
@@ -778,6 +770,7 @@ export function OrdersPage() {
             tú, puedes separarlo cuando las mesas estén libres. Los grupos de
             administración no se separan aquí.
           </p>
+          <StatusLegend variant="salon" />
           {joinSource != null ? (
             <div className="table-join-banner">
               <span>
@@ -895,8 +888,10 @@ export function OrdersPage() {
                   : "Puedes agregar más platos si piden extra"}
               </p>
             </div>
-            <span className={`badge ${statusClass(activeOrder.status)}`}>
-              {statusLabel(activeOrder.status)}
+            <span
+              className={`badge ${toneClass(orderTone(activeOrder), isUnpaid(activeOrder))}`}
+            >
+              {orderToneLabel(orderTone(activeOrder), activeOrder.modality)}
             </span>
             <button
               type="button"
@@ -1010,7 +1005,10 @@ export function OrdersPage() {
             tabIndex={ticketOpen ? 0 : -1}
             onClick={() => setTicketOpen(false)}
           />
-          <aside className="pos-ticket" aria-hidden={!ticketOpen}>
+          <aside
+            className={`pos-ticket st-band ${toneClass(orderTone(activeOrder), isUnpaid(activeOrder))}`}
+            aria-hidden={!ticketOpen}
+          >
           <div className="pos-ticket-head">
             <div>
               <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
@@ -1030,7 +1028,11 @@ export function OrdersPage() {
             </div>
             <div className="pos-ticket-head-actions">
               {activeOrder.kitchen_ticket ? (
-                <span className="muted">
+                <span
+                  className={`badge ${toneClass(
+                    kitchenTone(activeOrder.kitchen_ticket.status)
+                  )}`}
+                >
                   {kitchenStatusLabel(activeOrder.kitchen_ticket.status)}
                 </span>
               ) : null}

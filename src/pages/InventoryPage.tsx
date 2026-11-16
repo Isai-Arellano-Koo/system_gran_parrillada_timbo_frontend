@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { catalogApi, inventoryApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Ingredient, InventoryMovement, StockAlert } from "../types";
@@ -83,6 +84,10 @@ export function InventoryPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["inventory", "orders"], () => {
+    load().catch(() => undefined);
+  });
 
   const visibleStock = useMemo(() => {
     return ingredients.filter((item) => {

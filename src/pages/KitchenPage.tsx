@@ -9,6 +9,9 @@ import {
   orderCodeLabel,
   tablesLabel,
 } from "../types";
+import { StatusLegend } from "../components/StatusLegend";
+import { useLiveReload } from "../context/LiveContext";
+import { kitchenTone, toneClass } from "../helpers/orderStatus";
 
 const FLOW: KitchenTicket["status"][] = [
   "pendiente",
@@ -18,10 +21,7 @@ const FLOW: KitchenTicket["status"][] = [
 ];
 
 function badgeFor(status?: string) {
-  if (status === "pendiente") return "badge-warn";
-  if (status === "en_preparacion") return "badge-edit";
-  if (status === "listo") return "badge-ok";
-  return "badge-ok";
+  return toneClass(kitchenTone(status));
 }
 
 function nextStatus(current?: string) {
@@ -62,11 +62,11 @@ export function KitchenPage() {
     load().catch((err) =>
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
-    const id = window.setInterval(() => {
-      load().catch(() => undefined);
-    }, 8000);
-    return () => window.clearInterval(id);
   }, [token]);
+
+  useLiveReload(["kitchen", "orders"], () => {
+    load().catch(() => undefined);
+  });
 
   const canCook = user?.role === "cocinero" || user?.role === "admin";
   const canServe = canCook || user?.role === "mesero";
@@ -102,6 +102,7 @@ export function KitchenPage() {
             Abre la comanda y marca cada plato cuando va saliendo. No hace falta
             que salgan todos juntos.
           </p>
+          <StatusLegend variant="kitchen" />
         </div>
       </div>
 
@@ -118,7 +119,9 @@ export function KitchenPage() {
           ).length;
           return (
             <article
-              className={`ticket kitchen-card${open ? " open" : ""}`}
+              className={`ticket kitchen-card st-band ${toneClass(
+                kitchenTone(ticket.status)
+              )}${open ? " open" : ""}`}
               key={ticket.id}
             >
               <button
@@ -166,7 +169,9 @@ export function KitchenPage() {
                       return (
                         <article
                           key={detail.id}
-                          className={`kitchen-dish kitchen-dish-${status}`}
+                          className={`kitchen-dish st-band ${toneClass(
+                            kitchenTone(status)
+                          )}${status === "entregado" ? " kitchen-dish-entregado" : ""}`}
                         >
                           <div>
                             <strong>

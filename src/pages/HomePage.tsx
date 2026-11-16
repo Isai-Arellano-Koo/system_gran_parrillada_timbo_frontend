@@ -9,6 +9,7 @@ import type {
   StockAlert,
 } from "../types";
 import { formatTime } from "../helpers/datetime";
+import { useLiveReload } from "../context/LiveContext";
 
 function formatStock(value: number | string, unit: string) {
   const amount = Number(value);
@@ -118,43 +119,48 @@ export function HomePage() {
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
 
-  useEffect(() => {
+  const load = async () => {
     if (!token) return;
-    const load = async () => {
-      try {
-        const tasks: Promise<void>[] = [];
-        if (canOrders || canKitchen) {
-          tasks.push(
-            ordersApi.list(token).then((list) => setOrders(list)).catch(() => {
-              setOrders([]);
-            })
-          );
-        }
-        if (canKitchen) {
-          tasks.push(
-            kitchenApi.list(token).then((list) => setTickets(list)).catch(() => {
-              setTickets([]);
-            })
-          );
-        }
-        if (canInventory) {
-          tasks.push(
-            Promise.all([
-              inventoryApi.listAlerts(token),
-              inventoryApi.listMovements(token),
-            ]).then(([alertList, movementList]) => {
-              setAlerts(alertList);
-              setMovements(movementList);
-            })
-          );
-        }
-        await Promise.all(tasks);
-      } catch {
-        /* ignore summary errors */
+    try {
+      const tasks: Promise<void>[] = [];
+      if (canOrders || canKitchen) {
+        tasks.push(
+          ordersApi.list(token).then((list) => setOrders(list)).catch(() => {
+            setOrders([]);
+          })
+        );
       }
-    };
-    load();
+      if (canKitchen) {
+        tasks.push(
+          kitchenApi.list(token).then((list) => setTickets(list)).catch(() => {
+            setTickets([]);
+          })
+        );
+      }
+      if (canInventory) {
+        tasks.push(
+          Promise.all([
+            inventoryApi.listAlerts(token),
+            inventoryApi.listMovements(token),
+          ]).then(([alertList, movementList]) => {
+            setAlerts(alertList);
+            setMovements(movementList);
+          })
+        );
+      }
+      await Promise.all(tasks);
+    } catch {
+      /* ignore summary errors */
+    }
+  };
+
+  useEffect(() => {
+    void load();
   }, [token, canOrders, canKitchen, canInventory]);
+
+  useLiveReload(["orders", "kitchen", "inventory", "tables"], () => {
+    void load();
+  });
 
   const activeOrders = useMemo(
     () => orders.filter((order) => order.status === "en_edicion" || order.status === "confirmado"),

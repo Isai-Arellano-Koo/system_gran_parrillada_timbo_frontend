@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { AttentionModality, SoldDish } from "../types";
@@ -19,15 +20,23 @@ export function SoldDishesPage() {
   const [modality, setModality] = useState<"all" | AttentionModality>("all");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!token) return;
-    ordersApi
+  const load = () => {
+    if (!token) return Promise.resolve();
+    return ordersApi
       .soldDishes(token)
       .then(setItems)
       .catch((err) =>
         setError(err instanceof ApiError ? err.message : "Error al cargar")
       );
+  };
+
+  useEffect(() => {
+    void load();
   }, [token]);
+
+  useLiveReload(["orders"], () => {
+    void load();
+  });
 
   const visible = useMemo(
     () =>

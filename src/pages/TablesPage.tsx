@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { TableChange, TableItem } from "../types";
@@ -34,6 +35,10 @@ export function TablesPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["tables", "orders"], () => {
+    load().catch(() => undefined);
+  });
 
   const selectedTables = useMemo(
     () => tables.filter((table) => selected.includes(table.id)),

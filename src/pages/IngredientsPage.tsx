@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { catalogApi } from "../api/services";
 import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
@@ -35,6 +36,10 @@ export function IngredientsPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["catalog", "inventory"], () => {
+    load().catch(() => undefined);
+  });
 
   const resetForm = (open = false) => {
     setEditingId(null);

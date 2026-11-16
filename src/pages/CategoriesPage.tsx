@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category } from "../types";
@@ -27,6 +28,10 @@ export function CategoriesPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["catalog"], () => {
+    load().catch(() => undefined);
+  });
 
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
