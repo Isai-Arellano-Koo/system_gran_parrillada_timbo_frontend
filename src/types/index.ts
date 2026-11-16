@@ -140,6 +140,8 @@ export type TableItem = {
   group_id?: number | null;
   group_numbers?: number[];
   occupied?: boolean;
+  group_created_by?: number | null;
+  can_ungroup?: boolean;
 };
 
 export type TableChange = {
@@ -260,9 +262,11 @@ export type WaiterNotification = {
   id: number;
   order_id: number;
   kitchen_ticket_id: number;
+  order_detail_id?: number | null;
   waiter_id: number;
   order_code: string;
   table_label: string;
+  dish_label?: string;
   generated_at: string;
   attended_at: string | null;
 };

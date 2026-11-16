@@ -301,7 +301,7 @@ export const ordersApi = {
       body: { from_table_id, to_table_id },
     }),
   splitTable: (token: string, table_id: number) =>
-    apiRequest<Order>("/api/orders/split-table", {
+    apiRequest<TableItem[]>("/api/orders/split-table", {
       method: "POST",
       token,
       body: { table_id },

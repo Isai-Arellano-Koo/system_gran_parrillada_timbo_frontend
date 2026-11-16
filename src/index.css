@@ -1823,6 +1823,24 @@ button.badge:disabled {
   gap: 0.7rem;
 }
 
+.table-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.table-split {
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 999px;
+  min-height: 28px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+}
+
 .table-join-hint {
   margin: 0.15rem 0 0.75rem;
 }

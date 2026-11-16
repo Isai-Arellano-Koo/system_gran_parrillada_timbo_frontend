@@ -50,10 +50,18 @@ export function NotificationBell() {
     for (const item of list.pending) seen.current.add(item.id);
     setData(list);
     if (announce && fresh.length) {
-      const newest = fresh[0];
-      const played = await playReadyChime();
+      setToast(fresh[0]);
+      let played = false;
+      for (let index = 0; index < fresh.length; index += 1) {
+        if (index === 0) {
+          played = await playReadyChime();
+        } else {
+          window.setTimeout(() => {
+            void playReadyChime();
+          }, index * 280);
+        }
+      }
       setSoundOn(played || notifySoundReady());
-      setToast(newest);
     }
   };
 
@@ -151,7 +159,7 @@ export function NotificationBell() {
         <div className="notify-panel" role="dialog" aria-label="Notificaciones">
           <header className="notify-head">
             <h2>Notificaciones</h2>
-            <p>Comandas listas para recoger</p>
+            <p>Platos listos para recoger</p>
           </header>
           <div className="notify-tabs" role="tablist">
             <button
@@ -173,7 +181,7 @@ export function NotificationBell() {
             {!items.length ? (
               <p className="notify-empty">
                 {tab === "pending"
-                  ? "No hay comandas pendientes de recoger."
+                  ? "No hay platos pendientes de recoger."
                   : "Todavía no hay notificaciones atendidas."}
               </p>
             ) : (
@@ -181,8 +189,10 @@ export function NotificationBell() {
                 <article key={item.id} className="notify-card">
                   <div className="notify-card-top">
                     <div>
-                      <strong>{orderTitle(item)}</strong>
-                      <span>{item.table_label}</span>
+                      <strong>{item.dish_label || orderTitle(item)}</strong>
+                      <span>
+                        {orderTitle(item)} · {item.table_label}
+                      </span>
                     </div>
                     <em className={item.attended_at ? "done" : "ready"}>
                       {item.attended_at ? "Atendida" : "Listo"}
@@ -224,9 +234,9 @@ export function NotificationBell() {
                 </svg>
               </span>
               <span>
-                <strong>Nueva comanda lista para recoger</strong>
+                <strong>Plato listo para recoger</strong>
                 <em>
-                  {orderTitle(toast)} · {toast.table_label}
+                  {toast.dish_label || orderTitle(toast)} · {toast.table_label}
                 </em>
                 <em className="sound">
                   {soundOn
