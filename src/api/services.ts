@@ -15,6 +15,8 @@ import type {
   TableItem,
   User,
   UserStatusChange,
+  WaiterNotification,
+  WaiterNotificationList,
 } from "../types";
 
 // Llamadas al backend agrupadas por módulo
@@ -385,6 +387,16 @@ export const ordersApi = {
       token,
       body: { reason },
     }),
+};
+
+export const notificationsApi = {
+  list: (token: string) =>
+    apiRequest<WaiterNotificationList>("/api/notifications", { token }),
+  attend: (token: string, notificationId: number) =>
+    apiRequest<WaiterNotification>(
+      `/api/notifications/${notificationId}/attend`,
+      { method: "PATCH", token }
+    ),
 };
 
 export const kitchenApi = {

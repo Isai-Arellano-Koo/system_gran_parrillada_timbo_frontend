@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { roleAvatar, roleLabel } from "../constants/roles";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationBell } from "./NotificationBell";
 import type { UserRole } from "../types";
 
 type NavItem = {
@@ -211,6 +212,7 @@ export function AppLayout() {
           </div>
           <div className="topbar-actions">
             <ThemeToggle />
+            <NotificationBell />
             {user ? (
               <div className="topbar-user">
                 <img

@@ -255,3 +255,20 @@ export type StockAlert = {
   stock_current: number;
   stock_minimum: number;
 };
+
+export type WaiterNotification = {
+  id: number;
+  order_id: number;
+  kitchen_ticket_id: number;
+  waiter_id: number;
+  order_code: string;
+  table_label: string;
+  generated_at: string;
+  attended_at: string | null;
+};
+
+export type WaiterNotificationList = {
+  pending: WaiterNotification[];
+  history: WaiterNotification[];
+  pending_count: number;
+};

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
@@ -85,6 +86,8 @@ function isSentToKitchen(detail: OrderDetail) {
 
 export function OrdersPage() {
   const { token, user } = useAuth();
+  const [params] = useSearchParams();
+  const wantedOrder = Number(params.get("order") || 0);
   const [tables, setTables] = useState<TableItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -208,6 +211,16 @@ export function OrdersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !wantedOrder) return;
+    ordersApi
+      .get(token, wantedOrder)
+      .then((order) => applyOrder(order))
+      .catch((err) =>
+        setError(err instanceof ApiError ? err.message : "No se pudo abrir el pedido")
+      );
+  }, [token, wantedOrder]);
 
   useEffect(
     () => () => {
