@@ -1691,6 +1691,36 @@ tr.st-band td:first-child {
   color: var(--muted);
 }
 
+.history-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1080px) {
+  .history-layout.has-detail {
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+    align-items: start;
+  }
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 8.2rem 1fr;
+  gap: 0.4rem 0.8rem;
+  margin: 0 0 1rem;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
 .catalog-head {
   align-items: start;
 }
@@ -1703,6 +1733,10 @@ tr.st-band td:first-child {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--bg-soft);
+}
+
+.panel .page-tabs {
+  margin: 0 0 0.85rem;
 }
 
 .page-tab {

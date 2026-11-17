@@ -87,6 +87,7 @@ En el despliegue, `VITE_API_URL` debe apuntar a la URL pública del backend y de
 | `/orders` | Pedidos: abrir por mesa, unir mesas libres, agregar platos con observaciones, validar stock, confirmar, enviar extras, registrar el pago, cerrar o cancelar. El aviso de comanda lista abre el pedido (HU06 a HU09, HU13, HU18, HU20) | admin, mesero |
 | `/delivery` | Pedidos delivery: registro sin mesa, platos, confirmación, pago y cierre (HU21) | admin, cajero |
 | `/sales` | Historial de platos vendidos (mesa y delivery) | admin, cajero |
+| `/historial-pedidos` | Historial de pedidos por modalidad (mesa, delivery o para llevar), con mesa y quien atendió | admin |
 | `/kitchen` | Comandas de cocina: estado de la comanda y de cada plato (HU10, HU11) | admin, cocinero, mesero |
 
 Las rutas protegidas redirigen al inicio de sesión si no hay sesión activa, y al inicio si el rol no tiene permiso. El login acepta correo o nombre de usuario. Si la cuenta aún no confirmó su correo, el sistema pide el código de verificación antes de dejar entrar.

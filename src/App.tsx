@@ -15,6 +15,7 @@ import { OrdersPage } from "./pages/OrdersPage";
 import { TablesPage } from "./pages/TablesPage";
 import { DeliveryOrdersPage } from "./pages/DeliveryOrdersPage";
 import { SoldDishesPage } from "./pages/SoldDishesPage";
+import { OrdersHistoryPage } from "./pages/OrdersHistoryPage";
 import { KitchenPage } from "./pages/KitchenPage";
 import { UsersPage } from "./pages/UsersPage";
 import { UsersHistoryPage } from "./pages/UsersHistoryPage";
@@ -46,6 +47,7 @@ export default function App() {
                 <Route path="/users/nuevo" element={<UserFormPage />} />
                 <Route path="/users/:id" element={<UserFormPage />} />
                 <Route path="/tables" element={<TablesPage />} />
+                <Route path="/historial-pedidos" element={<OrdersHistoryPage />} />
               </Route>
               <Route
                 element={<ProtectedRoute roles={["admin", "mesero"]} />}

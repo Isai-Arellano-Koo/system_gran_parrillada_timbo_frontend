@@ -76,3 +76,10 @@ export function orderToneLabel(tone: OrderTone, modality?: string) {
 export function toneClass(tone: OrderTone, unpaid = false) {
   return `st st-${tone}${unpaid ? " st-unpaid" : ""}`;
 }
+
+export function orderStatusLabel(order: Order) {
+  if (order.status === "en_edicion") return "En edición";
+  if (order.status === "cancelado") return "Cancelado";
+  if (order.status === "cerrado") return "Cerrado";
+  return orderToneLabel(orderTone(order), order.modality);
+}
