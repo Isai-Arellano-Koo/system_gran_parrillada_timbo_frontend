@@ -13,7 +13,7 @@ import {
   tableNumbers,
   tablesLabel,
 } from "../types";
-import { formatTime } from "../helpers/datetime";
+import { formatDateTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
 import { useLiveReload } from "../context/LiveContext";
 import { StatusLegend } from "../components/StatusLegend";
@@ -934,6 +934,12 @@ export function OrdersPage() {
                         : state.label}
                     </span>
                     {open ? <em>{money(open.total)}</em> : null}
+                    {open ? (
+                      <em>
+                        {open.waiter?.name || "Sin mesero"} ·{" "}
+                        {formatDateTime(open.created_at)}
+                      </em>
+                    ) : null}
                   </button>
                   {canSplit ? (
                     <button
@@ -1107,8 +1113,8 @@ export function OrdersPage() {
             <div>
               <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
               <p>
-                {tablesLabel(activeOrder)} · {formatTime(activeOrder.created_at)} ·{" "}
-                {activeOrder.waiter?.name || user?.name || "Mesero"}
+                {tablesLabel(activeOrder)} · {formatDateTime(activeOrder.created_at)}{" "}
+                · {activeOrder.waiter?.name || user?.name || "Mesero"}
               </p>
               {tableNumbers(activeOrder).length > 1 ? (
                 <div className="table-chips">

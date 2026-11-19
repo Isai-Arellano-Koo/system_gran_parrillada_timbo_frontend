@@ -12,6 +12,7 @@ import {
 import { StatusLegend } from "../components/StatusLegend";
 import { useLiveReload } from "../context/LiveContext";
 import { kitchenTone, toneClass } from "../helpers/orderStatus";
+import { formatDateTime } from "../helpers/datetime";
 import { returnKindLabel } from "../components/OrderStockActions";
 
 const FLOW: KitchenTicket["status"][] = [
@@ -141,6 +142,12 @@ export function KitchenPage() {
                           ticket.order.delivery_customer_name || "Sin nombre"
                         }`}{" "}
                     · {ready}/{details.length} listos
+                  </div>
+                  <div className="muted">
+                    {ticket.order?.waiter?.name || "Sin mesero"} ·{" "}
+                    {formatDateTime(
+                      ticket.order?.created_at || ticket.created_at
+                    )}
                   </div>
                 </div>
                 <div className="actions">

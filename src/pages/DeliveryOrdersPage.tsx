@@ -5,7 +5,7 @@ import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail } from "../types";
 import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
-import { formatTime } from "../helpers/datetime";
+import { formatDateTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
 import { useLiveReload } from "../context/LiveContext";
 import { StatusLegend } from "../components/StatusLegend";
@@ -556,7 +556,10 @@ export function DeliveryOrdersPage() {
                   >
                     <td>
                       <strong>{orderCodeLabel(order)}</strong>
-                      <div className="hint">{formatTime(order.created_at)}</div>
+                      <div className="hint">
+                        {order.waiter?.name || "Sin responsable"} ·{" "}
+                        {formatDateTime(order.created_at)}
+                      </div>
                     </td>
                     <td>{attentionLabel(order.modality)}</td>
                     <td>{order.delivery_customer_name || "—"}</td>
@@ -798,7 +801,8 @@ export function DeliveryOrdersPage() {
                 <p>
                   {attentionLabel(activeOrder.modality)} ·{" "}
                   {activeOrder.delivery_customer_name} ·{" "}
-                  {formatTime(activeOrder.created_at)}
+                  {activeOrder.waiter?.name || "Sin responsable"} ·{" "}
+                  {formatDateTime(activeOrder.created_at)}
                 </p>
                 <p className="hint">
                   {activeOrder.delivery_address}
