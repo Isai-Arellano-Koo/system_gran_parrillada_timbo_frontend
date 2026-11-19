@@ -69,7 +69,6 @@ export function KitchenPage() {
   });
 
   const canCook = user?.role === "cocinero" || user?.role === "admin";
-  const canServe = canCook || user?.role === "mesero";
 
   const applyTicket = (ticket: KitchenTicket) => {
     setTickets((prev) => prev.map((item) => (item.id === ticket.id ? ticket : item)));
@@ -79,8 +78,7 @@ export function KitchenPage() {
     if (!token) return;
     const next = nextStatus(dishKitchenStatus(detail));
     if (!next) return;
-    if (next !== "entregado" && !canCook) return;
-    if (next === "entregado" && !canServe) return;
+    if (!canCook) return;
     setBusyId(detail.id);
     try {
       applyTicket(await kitchenApi.updateDishStatus(token, detail.id, next));
@@ -162,10 +160,7 @@ export function KitchenPage() {
                     details.map((detail) => {
                       const status = dishKitchenStatus(detail);
                       const next = nextStatus(status);
-                      const canAdvance =
-                        Boolean(next) &&
-                        ((next === "entregado" && canServe) ||
-                          (next !== "entregado" && canCook));
+                      const canAdvance = Boolean(next) && canCook;
                       return (
                         <article
                           key={detail.id}

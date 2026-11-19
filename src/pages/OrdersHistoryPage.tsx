@@ -89,6 +89,15 @@ export function OrdersHistoryPage() {
     load(selectedId.current).catch(() => undefined);
   });
 
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selected]);
+
   const visible = useMemo(
     () =>
       orders.filter((order) =>
@@ -142,8 +151,7 @@ export function OrdersHistoryPage() {
       </div>
       {error ? <div className="alert alert-error">{error}</div> : null}
 
-      <div className={`history-layout${selected ? " has-detail" : ""}`}>
-        <section className="panel">
+      <section className="panel">
           <div className="list-head">
             <div>
               <h2>Pedidos</h2>
@@ -249,11 +257,22 @@ export function OrdersHistoryPage() {
           />
         </section>
 
-        {selected ? (
-          <section className="panel">
+      {selected ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="dialog dialog-wide panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-history-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="list-head">
               <div>
-                <h2>Detalle</h2>
+                <h2 id="order-history-detail-title">Detalle del pedido</h2>
                 <p>{orderCodeLabel(selected)}</p>
               </div>
               <button
@@ -357,9 +376,9 @@ export function OrdersHistoryPage() {
                 <div className="empty">Este pedido no tiene platos.</div>
               ) : null}
             </div>
-          </section>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

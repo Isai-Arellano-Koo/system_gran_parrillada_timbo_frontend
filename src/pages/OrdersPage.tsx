@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { subscribeOpenOrder } from "../helpers/openOrder";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
@@ -68,7 +69,7 @@ function isSentToKitchen(detail: OrderDetail) {
 
 export function OrdersPage() {
   const { token, user } = useAuth();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const wantedOrder = Number(params.get("order") || 0);
   const [tables, setTables] = useState<TableItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -201,15 +202,31 @@ export function OrdersPage() {
     load(liveOrderId.current).catch(() => undefined);
   });
 
-  useEffect(() => {
-    if (!token || !wantedOrder) return;
+  const applyOrderRef = useRef<(order: Order) => Promise<void>>(async () => {});
+
+  const openOrderById = (orderId: number) => {
+    if (!token || !orderId) return;
+    setError("");
     ordersApi
-      .get(token, wantedOrder)
-      .then((order) => applyOrder(order))
+      .get(token, orderId)
+      .then((order) => applyOrderRef.current(order))
+      .then(() => setTicketOpen(true))
       .catch((err) =>
         setError(err instanceof ApiError ? err.message : "No se pudo abrir el pedido")
       );
+  };
+
+  useEffect(() => {
+    if (!token || !wantedOrder) return;
+    openOrderById(wantedOrder);
   }, [token, wantedOrder]);
+
+  useEffect(() => {
+    if (!token) return;
+    return subscribeOpenOrder((orderId) => {
+      openOrderById(orderId);
+    });
+  }, [token]);
 
   useEffect(
     () => () => {
@@ -260,6 +277,7 @@ export function OrdersPage() {
     }
     await load(order.id);
   };
+  applyOrderRef.current = applyOrder;
 
   const pickTable = async (table: TableItem) => {
     if (!token) return;
@@ -650,6 +668,11 @@ export function OrdersPage() {
     setShowCancel(false);
     setError("");
     setDishQuery("");
+    if (params.get("order")) {
+      const next = new URLSearchParams(params);
+      next.delete("order");
+      setSearchParams(next, { replace: true });
+    }
   };
 
   const shortageFor = (detail: OrderDetail) => {
