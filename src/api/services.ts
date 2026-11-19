@@ -243,6 +243,16 @@ export const inventoryApi = {
   },
   listAlerts: (token: string) =>
     apiRequest<StockAlert[]>("/api/inventory/alerts", { token }),
+  reviewMerma: (
+    token: string,
+    movementId: number,
+    action: "recuperar" | "descartar"
+  ) =>
+    apiRequest<InventoryMovement>(`/api/inventory/movements/${movementId}/review`, {
+      method: "POST",
+      token,
+      body: { action },
+    }),
 };
 
 export const ordersApi = {
@@ -387,6 +397,16 @@ export const ordersApi = {
       token,
       body: { reason },
     }),
+  returnDetail: (
+    token: string,
+    orderId: number,
+    detailId: number,
+    body: { kind: "no_le_gusto" | "defecto"; note?: string }
+  ) =>
+    apiRequest<Order>(
+      `/api/orders/${orderId}/details/${detailId}/return`,
+      { method: "POST", token, body }
+    ),
 };
 
 export const notificationsApi = {

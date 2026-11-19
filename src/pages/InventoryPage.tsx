@@ -36,7 +36,13 @@ function toDateInput(date: Date) {
 }
 
 function movementOrderLabel(item: InventoryMovement) {
-  if (item.type !== "salida_venta") return "—";
+  if (
+    item.type !== "salida_venta" &&
+    item.type !== "devolucion" &&
+    item.type !== "merma"
+  ) {
+    return "—";
+  }
   if (item.order?.code) {
     const mesa = item.order.table?.number ?? item.order.table_id;
     return mesa
@@ -66,6 +72,7 @@ export function InventoryPage() {
   const [moveTo, setMoveTo] = useState("");
   const [showEntry, setShowEntry] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
 
   const load = async () => {
     if (!token) return;
@@ -152,6 +159,14 @@ export function InventoryPage() {
     moveTo,
   ]);
 
+  const pendingMerma = useMemo(
+    () =>
+      movements.filter(
+        (item) => item.type === "merma" && (!item.merma_review || item.merma_review === "pendiente")
+      ),
+    [movements]
+  );
+  const pagedMerma = usePagedRows(pendingMerma, `merma|${pendingMerma.length}`);
   const pagedStock = usePagedRows(visibleStock, `${stockQuery}|${stockFilter}`);
   const pagedMoves = usePagedRows(
     visibleMoves,
@@ -161,6 +176,29 @@ export function InventoryPage() {
   const closeEntry = () => {
     if (saving) return;
     setShowEntry(false);
+  };
+
+  const reviewMerma = async (
+    item: InventoryMovement,
+    action: "recuperar" | "descartar"
+  ) => {
+    if (!token) return;
+    setError("");
+    setOk("");
+    setReviewingId(item.id);
+    try {
+      await inventoryApi.reviewMerma(token, item.id, action);
+      setOk(
+        action === "recuperar"
+          ? "Ingrediente vuelto al stock"
+          : "Merma confirmada, no vuelve al stock"
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo revisar la merma");
+    } finally {
+      setReviewingId(null);
+    }
   };
 
   const openEntry = () => {
@@ -197,7 +235,10 @@ export function InventoryPage() {
       <div className="page-head">
         <div>
           <h1>Inventario</h1>
-          <p>Registra entradas, revisa los movimientos y las alertas de stock.</p>
+          <p>
+            Registra entradas, revisa mermas y decide si algún insumo puede
+            volver al stock.
+          </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={openEntry}>
           Registrar entrada
@@ -237,6 +278,80 @@ export function InventoryPage() {
               </table>
             </div>
           )}
+      </section>
+
+      <section className="panel">
+        <div className="list-head">
+          <div>
+            <h2>Merma por revisar</h2>
+            <p>
+              {pendingMerma.length}{" "}
+              {pendingMerma.length === 1
+                ? "insumo pendiente"
+                : "insumos pendientes"}
+              . Recupera lo que todavía sirve o confirma que se tira.
+            </p>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Ingrediente</th>
+                <th>Cantidad</th>
+                <th>Pedido</th>
+                <th>Motivo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedMerma.rows.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    {item.created_at
+                      ? new Date(item.created_at).toLocaleString()
+                      : "—"}
+                  </td>
+                  <td>{item.ingredient?.name || item.ingredient_id}</td>
+                  <td>
+                    {Number(item.quantity)} {item.ingredient?.unit || ""}
+                  </td>
+                  <td>{movementOrderLabel(item)}</td>
+                  <td>{item.reason || "—"}</td>
+                  <td>
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={reviewingId === item.id}
+                        onClick={() => void reviewMerma(item, "recuperar")}
+                      >
+                        Volver al stock
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={reviewingId === item.id}
+                        onClick={() => void reviewMerma(item, "descartar")}
+                      >
+                        Confirmar merma
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!pendingMerma.length ? (
+            <div className="empty">No hay merma pendiente de revisión</div>
+          ) : null}
+        </div>
+        <TablePager
+          total={pendingMerma.length}
+          page={pagedMerma.current}
+          onPage={pagedMerma.setPage}
+        />
       </section>
 
       <section className="panel">

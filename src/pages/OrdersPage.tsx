@@ -18,6 +18,14 @@ import { matchesQuery } from "../helpers/search";
 import { useLiveReload } from "../context/LiveContext";
 import { StatusLegend } from "../components/StatusLegend";
 import {
+  CancelOrderBox,
+  ReturnDishBox,
+  canCancelOrder,
+  cancelStockHint,
+  returnKindLabel,
+  type DishReturnKind,
+} from "../components/OrderStockActions";
+import {
   dueOf as orderDue,
   isUnpaid,
   kitchenTone,
@@ -58,6 +66,7 @@ function tableState(order?: Order) {
 }
 
 function lineTotal(detail: OrderDetail) {
+  if (detail.charged === false) return 0;
   return Number(detail.unit_price) * Number(detail.quantity);
 }
 
@@ -81,6 +90,9 @@ export function OrdersPage() {
   const [shortages, setShortages] = useState<Shortage[]>([]);
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
+  const [returnDetail, setReturnDetail] = useState<OrderDetail | null>(null);
+  const [returnKind, setReturnKind] = useState<DishReturnKind>("no_le_gusto");
+  const [returnNote, setReturnNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -615,6 +627,34 @@ export function OrdersPage() {
     }
   };
 
+  const returnDish = async () => {
+    if (!token || !activeOrder || !returnDetail) return;
+    setError("");
+    setBusy(true);
+    try {
+      const order = await ordersApi.returnDetail(
+        token,
+        activeOrder.id,
+        returnDetail.id,
+        { kind: returnKind, note: returnNote }
+      );
+      setMessage(
+        returnKind === "defecto"
+          ? "Defecto registrado. El plato no se cobra. Si lo cambias, agrégalo otra vez."
+          : "Devolución registrada. El plato se cobra igual."
+      );
+      setReturnDetail(null);
+      setReturnNote("");
+      await applyOrder(order);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "No se pudo registrar la devolución"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendAdditions = async () => {
     if (!token || !activeOrder || !unsent.length) return;
     setError("");
@@ -743,6 +783,36 @@ export function OrdersPage() {
               : ""}
           </p>
         )}
+        {detail.return_kind ? (
+          <p className="muted">{returnKindLabel(detail.return_kind)}</p>
+        ) : activeOrder?.status === "confirmado" && sentLine ? (
+          returnDetail?.id === detail.id ? (
+            <ReturnDishBox
+              detail={detail}
+              kind={returnKind}
+              note={returnNote}
+              onKind={setReturnKind}
+              onNote={setReturnNote}
+              busy={busy}
+              onConfirm={() => void returnDish()}
+              onClose={() => setReturnDetail(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={() => {
+                setShowCancel(false);
+                setReturnKind("no_le_gusto");
+                setReturnNote("");
+                setReturnDetail(detail);
+              }}
+            >
+              Devolver / merma
+            </button>
+          )
+        ) : null}
         {canChangeQty ? (
           <input
             className="pos-note"
@@ -1140,26 +1210,22 @@ export function OrdersPage() {
                 Confirmar pedido
               </button>
               {showCancel ? (
-                <div className="pos-cancel">
-                  <input
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="Motivo de cancelación"
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    disabled={busy}
-                    onClick={cancelOrder}
-                  >
-                    Confirmar cancelación
-                  </button>
-                </div>
+                <CancelOrderBox
+                  order={activeOrder}
+                  reason={cancelReason}
+                  onReason={setCancelReason}
+                  busy={busy}
+                  onConfirm={() => void cancelOrder()}
+                  onClose={() => setShowCancel(false)}
+                />
               ) : (
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => setShowCancel(true)}
+                  onClick={() => {
+                    setReturnDetail(null);
+                    setShowCancel(true);
+                  }}
                 >
                   Cancelar pedido
                 </button>
@@ -1199,6 +1265,30 @@ export function OrdersPage() {
               >
                 Liberar mesa
               </button>
+              {showCancel ? (
+                <CancelOrderBox
+                  order={activeOrder}
+                  reason={cancelReason}
+                  onReason={setCancelReason}
+                  busy={busy}
+                  onConfirm={() => void cancelOrder()}
+                  onClose={() => setShowCancel(false)}
+                />
+              ) : canCancelOrder(activeOrder) ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setReturnDetail(null);
+                    setShowCancel(true);
+                  }}
+                >
+                  Cancelar pedido
+                </button>
+              ) : (
+                <p className="muted">{cancelStockHint(activeOrder)}</p>
+              )}
             </div>
           ) : activeOrder.kitchen_ticket ? (
             <p className="muted">

@@ -81,10 +81,10 @@ En el despliegue, `VITE_API_URL` debe apuntar a la URL pública del backend y de
 | `/categories` | Categorías de la carta | admin |
 | `/dishes/recetas`, `/dishes/:id/receta` | Recetas de cada plato (HU05) | admin |
 | `/ingredients` | Ingredientes (HU02) | admin |
-| `/inventory` | Inventario: entradas de stock, movimientos con filtros (HU14) y alertas de stock mínimo (HU15) | admin |
+| `/inventory` | Inventario: entradas, merma por revisar (recuperar al stock o confirmar), movimientos y alertas de mínimo | admin |
 | `/dishes` | Carta de platos, con pestañas por categoría (HU04) | admin, mesero |
 | `/tables` | Mesas del salón: habilitar, inhabilitar (con motivo) y agrupar mesas libres (HU18) | admin |
-| `/orders` | Pedidos: abrir por mesa, unir mesas libres, agregar platos con observaciones, validar stock, confirmar, enviar extras, registrar el pago, cerrar o cancelar. El aviso de comanda lista abre el pedido (HU06 a HU09, HU13, HU18, HU20) | admin, mesero |
+| `/orders` | Pedidos: abrir por mesa, unir mesas, platos, stock, confirmar, extras, cobro, cierre, cancelación con motivo y merma o reposición, devolución de un plato (no le gustó o defecto). El aviso de comanda lista abre el pedido | admin, mesero |
 | `/delivery` | Pedidos delivery: registro sin mesa, platos, confirmación, pago y cierre (HU21) | admin, cajero |
 | `/sales` | Historial de platos vendidos (mesa y delivery) | admin, cajero |
 | `/historial-pedidos` | Historial de pedidos por modalidad (mesa, delivery o para llevar), con mesa y quien atendió | admin |

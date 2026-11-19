@@ -163,6 +163,10 @@ export type OrderDetail = {
   observation?: string | null;
   sent_to_kitchen?: boolean;
   kitchen_status?: "pendiente" | "en_preparacion" | "listo" | "entregado";
+  charged?: boolean;
+  return_kind?: "no_le_gusto" | "defecto" | null;
+  return_note?: string | null;
+  returned_at?: string | null;
   dish?: Dish;
 };
 
@@ -204,6 +208,17 @@ export type Order = {
   status: "en_edicion" | "confirmado" | "cerrado" | "cancelado";
   total: number | string;
   cancel_reason?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: number | null;
+  cancelled_by_user?: User;
+  cancellation?: {
+    previous_status: string;
+    previous_kitchen_status?: string | null;
+    stock_action?: string;
+    reason: string;
+    created_at?: string;
+    cancelled_by_user?: User;
+  } | null;
   paid?: boolean;
   amount_paid?: number | string;
   paid_at?: string | null;
@@ -215,6 +230,7 @@ export type Order = {
   waiter?: User;
   details?: OrderDetail[];
   kitchen_ticket?: KitchenTicket | null;
+  inventory_movements?: InventoryMovement[];
 };
 
 export type SoldDish = {
@@ -239,6 +255,8 @@ export type InventoryMovement = {
   quantity: number | string;
   reason?: string | null;
   order_id?: number | null;
+  merma_review?: "pendiente" | "recuperada" | "descartada" | null;
+  reviewed_at?: string | null;
   created_at?: string;
   ingredient?: Ingredient;
   user?: User;

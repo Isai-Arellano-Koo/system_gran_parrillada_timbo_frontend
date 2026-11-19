@@ -16,6 +16,7 @@ import { matchesQuery } from "../helpers/search";
 import { usePagedRows } from "../helpers/pagination";
 import { TablePager } from "../components/TablePager";
 import { roleLabel } from "../constants/roles";
+import { returnKindLabel } from "../components/OrderStockActions";
 import {
   isUnpaid,
   kitchenTone,
@@ -332,6 +333,40 @@ export function OrdersHistoryPage() {
               <dd>{money(selected.total)}</dd>
               <dt>Creado</dt>
               <dd>{formatDateTime(selected.created_at)}</dd>
+              {selected.status === "cancelado" ? (
+                <>
+                  <dt>Canceló</dt>
+                  <dd>
+                    {selected.cancellation?.cancelled_by_user?.name ||
+                      selected.cancelled_by_user?.name ||
+                      "—"}
+                    {selected.cancellation?.cancelled_by_user?.role
+                      ? ` · ${roleLabel(selected.cancellation.cancelled_by_user.role)}`
+                      : ""}
+                  </dd>
+                  <dt>Antes</dt>
+                  <dd>
+                    {selected.cancellation?.previous_status || "—"}
+                    {selected.cancellation?.previous_kitchen_status
+                      ? ` · cocina ${selected.cancellation.previous_kitchen_status}`
+                      : ""}
+                  </dd>
+                  <dt>Motivo</dt>
+                  <dd>{selected.cancellation?.reason || selected.cancel_reason || "—"}</dd>
+                  <dt>Stock</dt>
+                  <dd>
+                    {selected.cancellation?.stock_action === "merma"
+                      ? "Registrado como merma (pendiente de revisión)"
+                      : "Sin movimiento de stock"}
+                  </dd>
+                  <dt>Cancelado</dt>
+                  <dd>
+                    {formatDateTime(
+                      selected.cancellation?.created_at || selected.cancelled_at
+                    )}
+                  </dd>
+                </>
+              ) : null}
             </dl>
             <div className="table-wrap">
               <table>
@@ -361,11 +396,19 @@ export function OrdersHistoryPage() {
                         {detail.observation ? (
                           <div className="hint">{detail.observation}</div>
                         ) : null}
+                        {detail.return_kind ? (
+                          <div className="hint">
+                            {returnKindLabel(detail.return_kind)}
+                            {detail.return_note ? ` · ${detail.return_note}` : ""}
+                          </div>
+                        ) : null}
                       </td>
                       <td>{detail.quantity}</td>
                       <td>
                         {money(
-                          Number(detail.unit_price) * Number(detail.quantity)
+                          detail.charged === false
+                            ? 0
+                            : Number(detail.unit_price) * Number(detail.quantity)
                         )}
                       </td>
                     </tr>
@@ -376,6 +419,42 @@ export function OrdersHistoryPage() {
                 <div className="empty">Este pedido no tiene platos.</div>
               ) : null}
             </div>
+            {(selected.inventory_movements || []).some(
+              (item) => item.type === "merma" || item.type === "devolucion"
+            ) ? (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Inventario</th>
+                      <th>Cant.</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selected.inventory_movements || [])
+                      .filter(
+                        (item) =>
+                          item.type === "merma" || item.type === "devolucion"
+                      )
+                      .map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            {item.type === "merma" ? "Merma" : "Devolución"}
+                            {item.ingredient?.name
+                              ? ` · ${item.ingredient.name}`
+                              : ""}
+                          </td>
+                          <td>
+                            {Number(item.quantity)} {item.ingredient?.unit || ""}
+                          </td>
+                          <td>{item.reason || "—"}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

@@ -12,6 +12,7 @@ import {
 import { StatusLegend } from "../components/StatusLegend";
 import { useLiveReload } from "../context/LiveContext";
 import { kitchenTone, toneClass } from "../helpers/orderStatus";
+import { returnKindLabel } from "../components/OrderStockActions";
 
 const FLOW: KitchenTicket["status"][] = [
   "pendiente",
@@ -160,7 +161,8 @@ export function KitchenPage() {
                     details.map((detail) => {
                       const status = dishKitchenStatus(detail);
                       const next = nextStatus(status);
-                      const canAdvance = Boolean(next) && canCook;
+                      const canAdvance =
+                        Boolean(next) && canCook && !detail.return_kind;
                       return (
                         <article
                           key={detail.id}
@@ -178,6 +180,9 @@ export function KitchenPage() {
                             ) : null}
                             {detail.observation ? (
                               <p className="kitchen-note">Nota: {detail.observation}</p>
+                            ) : null}
+                            {detail.return_kind ? (
+                              <p className="muted">{returnKindLabel(detail.return_kind)}</p>
                             ) : null}
                           </div>
                           <div className="kitchen-dish-actions">
