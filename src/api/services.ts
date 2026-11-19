@@ -9,6 +9,7 @@ import type {
   InventoryMovement,
   KitchenTicket,
   Order,
+  OrdersHistoryResponse,
   SoldDish,
   StockAlert,
   TableChange,
@@ -294,6 +295,30 @@ export const ordersApi = {
       modality ? `/api/orders?modality=${modality}` : "/api/orders",
       { token }
     ),
+  history: (
+    token: string,
+    params: {
+      date?: string;
+      from?: string;
+      to?: string;
+      status?: string;
+      modality?: "mesa" | "delivery" | "para_llevar";
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (params.date) query.set("date", params.date);
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    if (params.status && params.status !== "all") {
+      query.set("status", params.status);
+    }
+    if (params.modality) query.set("modality", params.modality);
+    const suffix = query.toString();
+    return apiRequest<OrdersHistoryResponse>(
+      `/api/orders/history${suffix ? `?${suffix}` : ""}`,
+      { token }
+    );
+  },
   soldDishes: (token: string) =>
     apiRequest<SoldDish[]>("/api/orders/sales", { token }),
   get: (token: string, orderId: number) =>

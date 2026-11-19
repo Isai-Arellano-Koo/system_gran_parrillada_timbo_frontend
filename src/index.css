@@ -1835,6 +1835,10 @@ tr.st-band td:first-child {
   gap: 0.9rem;
 }
 
+.ops-kpis-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .ops-kpi {
   background: var(--bg-elevated);
   border: 1px solid var(--line);
@@ -2941,7 +2945,8 @@ tr.st-band td:first-child {
     padding-right: 1rem;
   }
 
-  .ops-kpis {
+  .ops-kpis,
+  .ops-kpis-4 {
     grid-template-columns: 1fr;
   }
 

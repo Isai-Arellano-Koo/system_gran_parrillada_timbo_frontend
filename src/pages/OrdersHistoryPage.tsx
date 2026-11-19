@@ -3,7 +3,12 @@ import { useAuth } from "../context/AuthContext";
 import { useLiveReload } from "../context/LiveContext";
 import { ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
-import type { AttentionModality, Order } from "../types";
+import type {
+  AttentionModality,
+  Order,
+  OrderHistoryStatusFilter,
+  OrdersHistorySummary,
+} from "../types";
 import {
   attentionLabel,
   dishLabel,
@@ -11,7 +16,12 @@ import {
   orderCodeLabel,
   tablesLabel,
 } from "../types";
-import { formatDateTime } from "../helpers/datetime";
+import {
+  formatDateTime,
+  limaMonthStart,
+  limaYmd,
+  shiftLimaYmd,
+} from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
 import { usePagedRows } from "../helpers/pagination";
 import { TablePager } from "../components/TablePager";
@@ -45,46 +55,66 @@ function destination(order: Order) {
   return tablesLabel(order);
 }
 
+const emptySummary: OrdersHistorySummary = {
+  count: 0,
+  sales_total: 0,
+  pending_total: 0,
+  cancelled_total: 0,
+  by_status: {
+    en_edicion: { count: 0, total: 0 },
+    confirmado: { count: 0, total: 0 },
+    cerrado: { count: 0, total: 0 },
+    cancelado: { count: 0, total: 0 },
+  },
+};
+
 export function OrdersHistoryPage() {
   const { token } = useAuth();
+  const today = limaYmd();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [summary, setSummary] = useState<OrdersHistorySummary>(emptySummary);
   const [query, setQuery] = useState("");
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const [status, setStatus] = useState<OrderHistoryStatusFilter>("all");
   const [modality, setModality] = useState<ModalityFilter>("all");
   const [selected, setSelected] = useState<Order | null>(null);
   const [error, setError] = useState("");
 
   const selectedId = useRef<number | undefined>(undefined);
   selectedId.current = selected?.id;
-  const modalityRef = useRef(modality);
-  modalityRef.current = modality;
+  const filtersRef = useRef({ from, to, status, modality });
+  filtersRef.current = { from, to, status, modality };
 
   const load = async (keepId?: number) => {
     if (!token) return;
-    const filter = modalityRef.current;
-    const list = await ordersApi.list(
-      token,
-      filter === "all" ? undefined : filter
-    );
-    setOrders(list);
+    const filters = filtersRef.current;
+    const data = await ordersApi.history(token, {
+      from: filters.from,
+      to: filters.to,
+      status: filters.status,
+      modality: filters.modality === "all" ? undefined : filters.modality,
+    });
+    setOrders(data.orders);
+    setSummary(data.summary);
     const id = keepId ?? selectedId.current;
     if (!id) {
       setSelected(null);
       return;
     }
-    if (!list.some((order) => order.id === id)) {
+    if (!data.orders.some((order) => order.id === id)) {
       setSelected(null);
       return;
     }
     const detail = await ordersApi.get(token, id).catch(() => null);
-    setSelected(detail || list.find((order) => order.id === id) || null);
+    setSelected(detail || data.orders.find((order) => order.id === id) || null);
   };
 
   useEffect(() => {
-    load()
-      .catch((err) =>
-        setError(err instanceof ApiError ? err.message : "Error al cargar")
-      );
-  }, [token, modality]);
+    load().catch((err) =>
+      setError(err instanceof ApiError ? err.message : "Error al cargar")
+    );
+  }, [token, from, to, status, modality]);
 
   useLiveReload(["orders", "kitchen", "tables"], () => {
     load(selectedId.current).catch(() => undefined);
@@ -115,7 +145,7 @@ export function OrdersHistoryPage() {
       ),
     [orders, query]
   );
-  const paged = usePagedRows(visible, `${query}|${modality}`);
+  const paged = usePagedRows(visible, `${query}|${modality}|${from}|${to}|${status}`);
 
   const openDetail = async (order: Order) => {
     if (!token) return;
@@ -132,131 +162,236 @@ export function OrdersHistoryPage() {
   };
 
   const emptyMessage =
-    modality !== "all"
-      ? "No se encontraron resultados"
-      : query.trim()
-        ? "No se encontraron resultados"
-        : "Aún no hay pedidos registrados";
+    query.trim() || status !== "all" || modality !== "all" || from !== to
+      ? "No se encontraron pedidos en el periodo"
+      : "Aún no hay pedidos en esta fecha";
 
   return (
     <div>
       <div className="page-head">
         <div>
-          <p className="crumb">Administración › Pedidos</p>
-          <h1>Historial de pedidos</h1>
+          <p className="crumb">Administración › Ventas</p>
+          <h1>Historial de ventas</h1>
           <p>
-            Distingue mesa, delivery y para llevar. Revisa quién atendió cada
-            pedido y, si es de salón, la mesa.
+            Consulta pedidos por día o rango, distingue pendientes de
+            completados y revisa el importe del periodo.
           </p>
         </div>
       </div>
       {error ? <div className="alert alert-error">{error}</div> : null}
 
+      <div className="ops-kpis ops-kpis-4" style={{ marginBottom: "1rem" }}>
+        <article className="ops-kpi">
+          <div className="ops-kpi-top">
+            <span>Pedidos</span>
+          </div>
+          <strong>{summary.count}</strong>
+          <p>En el periodo seleccionado</p>
+        </article>
+        <article className="ops-kpi">
+          <div className="ops-kpi-top">
+            <span>Ventas</span>
+          </div>
+          <strong>{money(summary.sales_total)}</strong>
+          <p>Confirmados y cerrados</p>
+        </article>
+        <article className="ops-kpi">
+          <div className="ops-kpi-top">
+            <span>Pendientes</span>
+          </div>
+          <strong>{money(summary.pending_total)}</strong>
+          <p>
+            {summary.by_status.en_edicion.count} en edición ·{" "}
+            {summary.by_status.confirmado.count} confirmados
+          </p>
+        </article>
+        <article className="ops-kpi">
+          <div className="ops-kpi-top">
+            <span>Cancelados</span>
+          </div>
+          <strong>{money(summary.cancelled_total)}</strong>
+          <p>{summary.by_status.cancelado.count} pedidos</p>
+        </article>
+      </div>
+
       <section className="panel">
-          <div className="list-head">
-            <div>
-              <h2>Pedidos</h2>
-              <p>
-                {visible.length}{" "}
-                {visible.length === 1 ? "pedido" : "pedidos"}
-              </p>
-            </div>
+        <div className="list-head">
+          <div>
+            <h2>Pedidos</h2>
+            <p>
+              {visible.length}{" "}
+              {visible.length === 1 ? "pedido" : "pedidos"} · ventas{" "}
+              {money(summary.sales_total)}
+            </p>
           </div>
-          <div className="page-tabs" role="tablist" aria-label="Modalidad">
-            {(
-              [
-                ["all", "Todas"],
-                ["mesa", "Mesa"],
-                ["delivery", "Delivery"],
-                ["para_llevar", "Para llevar"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={modality === value}
-                className={`page-tab${modality === value ? " active" : ""}`}
-                onClick={() => {
-                  setModality(value);
-                  setSelected(null);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="filter-grid">
-            <label>
-              Buscar
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Orden, mesa, cliente, quien atendió…"
-              />
-            </label>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Orden</th>
-                  <th>Modalidad</th>
-                  <th>Destino</th>
-                  <th>Atendió</th>
-                  <th>Estado</th>
-                  <th>Total</th>
-                  <th></th>
+        </div>
+        <div className="page-tabs" role="tablist" aria-label="Modalidad">
+          {(
+            [
+              ["all", "Todas"],
+              ["mesa", "Mesa"],
+              ["delivery", "Delivery"],
+              ["para_llevar", "Para llevar"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={modality === value}
+              className={`page-tab${modality === value ? " active" : ""}`}
+              onClick={() => {
+                setModality(value);
+                setSelected(null);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="filter-dates">
+          <label>
+            Desde
+            <input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value || today)}
+            />
+          </label>
+          <label>
+            Hasta
+            <input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value || today)}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const now = limaYmd();
+              setFrom(now);
+              setTo(now);
+            }}
+          >
+            Hoy
+          </button>
+        </div>
+        <div className="filter-grid">
+          <label>
+            Estado
+            <select
+              value={status}
+              onChange={(e) =>
+                setStatus(e.target.value as OrderHistoryStatusFilter)
+              }
+            >
+              <option value="all">Todos</option>
+              <option value="pendientes">Pendientes</option>
+              <option value="completados">Completados</option>
+              <option value="en_edicion">En edición</option>
+              <option value="confirmado">Confirmado</option>
+              <option value="cerrado">Cerrado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </label>
+          <label>
+            Buscar
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Orden, mesa, cliente, quien atendió…"
+            />
+          </label>
+        </div>
+        <div className="filter-bar" style={{ marginBottom: "0.85rem" }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const now = limaYmd();
+              setFrom(shiftLimaYmd(now, -6));
+              setTo(now);
+            }}
+          >
+            7 días
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const now = limaYmd();
+              setFrom(limaMonthStart(now));
+              setTo(now);
+            }}
+          >
+            Este mes
+          </button>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Confirmación</th>
+                <th>Orden</th>
+                <th>Modalidad</th>
+                <th>Destino</th>
+                <th>Atendió</th>
+                <th>Estado</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.rows.map((order) => (
+                <tr
+                  key={order.id}
+                  className={`st-band ${toneClass(orderTone(order), isUnpaid(order))}${
+                    selected?.id === order.id ? " is-selected" : ""
+                  }`}
+                >
+                  <td>{formatDateTime(order.confirmed_at || order.created_at)}</td>
+                  <td>
+                    <strong>{orderCodeLabel(order)}</strong>
+                  </td>
+                  <td>{attentionLabel(order.modality)}</td>
+                  <td>{destination(order)}</td>
+                  <td>{attendedBy(order)}</td>
+                  <td>
+                    <span
+                      className={`badge ${toneClass(
+                        orderTone(order),
+                        isUnpaid(order)
+                      )}`}
+                    >
+                      {orderStatusLabel(order)}
+                    </span>
+                  </td>
+                  <td>{money(order.total)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => void openDetail(order)}
+                    >
+                      Ver
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paged.rows.map((order) => (
-                  <tr
-                    key={order.id}
-                    className={`st-band ${toneClass(orderTone(order), isUnpaid(order))}${
-                      selected?.id === order.id ? " is-selected" : ""
-                    }`}
-                  >
-                    <td>{formatDateTime(order.created_at)}</td>
-                    <td>
-                      <strong>{orderCodeLabel(order)}</strong>
-                    </td>
-                    <td>{attentionLabel(order.modality)}</td>
-                    <td>{destination(order)}</td>
-                    <td>{attendedBy(order)}</td>
-                    <td>
-                      <span
-                        className={`badge ${toneClass(
-                          orderTone(order),
-                          isUnpaid(order)
-                        )}`}
-                      >
-                        {orderStatusLabel(order)}
-                      </span>
-                    </td>
-                    <td>{money(order.total)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => void openDetail(order)}
-                      >
-                        Ver
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!visible.length ? <div className="empty">{emptyMessage}</div> : null}
-          </div>
-          <TablePager
-            total={visible.length}
-            page={paged.current}
-            onPage={paged.setPage}
-          />
-        </section>
+              ))}
+            </tbody>
+          </table>
+          {!visible.length ? <div className="empty">{emptyMessage}</div> : null}
+        </div>
+        <TablePager
+          total={visible.length}
+          page={paged.current}
+          onPage={paged.setPage}
+        />
+      </section>
 
       {selected ? (
         <div
@@ -333,6 +468,8 @@ export function OrdersHistoryPage() {
               <dd>{money(selected.total)}</dd>
               <dt>Creado</dt>
               <dd>{formatDateTime(selected.created_at)}</dd>
+              <dt>Confirmación</dt>
+              <dd>{formatDateTime(selected.confirmed_at)}</dd>
               {selected.status === "cancelado" ? (
                 <>
                   <dt>Canceló</dt>
@@ -374,6 +511,7 @@ export function OrdersHistoryPage() {
                   <tr>
                     <th>Plato</th>
                     <th>Cant.</th>
+                    <th>Precio</th>
                     <th>Total</th>
                   </tr>
                 </thead>
@@ -404,6 +542,7 @@ export function OrdersHistoryPage() {
                         ) : null}
                       </td>
                       <td>{detail.quantity}</td>
+                      <td>{money(detail.unit_price)}</td>
                       <td>
                         {money(
                           detail.charged === false

@@ -1,3 +1,19 @@
+export function limaYmd(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(
+    date
+  );
+}
+
+export function shiftLimaYmd(ymd: string, days: number) {
+  const date = new Date(`${ymd}T12:00:00-05:00`);
+  date.setDate(date.getDate() + days);
+  return limaYmd(date);
+}
+
+export function limaMonthStart(ymd = limaYmd()) {
+  return `${ymd.slice(0, 7)}-01`;
+}
+
 export function formatTime(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);

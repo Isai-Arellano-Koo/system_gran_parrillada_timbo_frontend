@@ -96,9 +96,9 @@ export function orderCodeLabel(order: {
   created_at?: string;
 }) {
   const code = order.code || "";
-  if (/^(MESA |DEL-|LLEVAR-)/i.test(code)) return code;
+  if (/^(MESA[- ]|MES-|DEL-|LLEVAR-|LLE-)/i.test(code)) return code;
   const mesa = code.match(/^M(\d{2})-\d{4}-(\d+)$/i);
-  if (mesa) return `MESA ${Number(mesa[1])}-${Number(mesa[2])}`;
+  if (mesa) return `MES-${Number(mesa[1])}-${Number(mesa[2])}`;
   const delivery = code.match(/^D-?\d{4}-(\d+)$/i);
   if (delivery) return `DEL-${Number(delivery[1])}`;
   return code || `Pedido ${order.id || ""}`;
@@ -231,6 +231,33 @@ export type Order = {
   details?: OrderDetail[];
   kitchen_ticket?: KitchenTicket | null;
   inventory_movements?: InventoryMovement[];
+};
+
+export type OrderHistoryStatusFilter =
+  | "all"
+  | "pendientes"
+  | "completados"
+  | "en_edicion"
+  | "confirmado"
+  | "cerrado"
+  | "cancelado";
+
+export type OrdersHistorySummary = {
+  count: number;
+  sales_total: number;
+  pending_total: number;
+  cancelled_total: number;
+  by_status: Record<
+    "en_edicion" | "confirmado" | "cerrado" | "cancelado",
+    { count: number; total: number }
+  >;
+};
+
+export type OrdersHistoryResponse = {
+  from: string;
+  to: string;
+  orders: Order[];
+  summary: OrdersHistorySummary;
 };
 
 export type SoldDish = {
