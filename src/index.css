@@ -1592,10 +1592,26 @@ tr.st-band td:first-child {
   gap: 0.5rem;
 }
 
+.kitchen-filters {
+  margin-bottom: 1rem;
+}
+
+.kitchen-filters .page-tabs {
+  margin: 0 0 0.85rem;
+}
+
+.kitchen-notes-filter {
+  margin: 0.15rem 0 0;
+}
+
 .kitchen-board {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
+}
+
+.kitchen-dish-group {
+  grid-column: 1 / -1;
 }
 
 .ticket {
