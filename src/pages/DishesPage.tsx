@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish } from "../types";
@@ -56,6 +57,10 @@ export function DishesPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token, canManage]);
+
+  useLiveReload(["catalog"], () => {
+    load().catch(() => undefined);
+  });
 
   const setTab = (next: "fichas" | "recetas") => {
     const nextParams = new URLSearchParams(params);

@@ -3,18 +3,23 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { roleAvatar, roleLabel } from "../constants/roles";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationBell } from "./NotificationBell";
 import type { UserRole } from "../types";
 
 type NavItem = {
   to: string;
   label: string;
-  icon: "home" | "orders" | "dishes" | "categories" | "ingredients" | "inventory" | "kitchen" | "users";
+  icon: "home" | "orders" | "tables" | "delivery" | "sales" | "history" | "dishes" | "categories" | "ingredients" | "inventory" | "kitchen" | "users";
   roles: UserRole[];
 };
 
 const NAV: NavItem[] = [
   { to: "/", label: "Resumen", icon: "home", roles: ["admin", "mesero", "cocinero", "cajero"] },
   { to: "/orders", label: "Pedidos", icon: "orders", roles: ["admin", "mesero"] },
+  { to: "/tables", label: "Mesas", icon: "tables", roles: ["admin"] },
+  { to: "/delivery", label: "Delivery / llevar", icon: "delivery", roles: ["admin", "cajero"] },
+  { to: "/sales", label: "Platos vendidos", icon: "sales", roles: ["admin", "cajero"] },
+  { to: "/historial-pedidos", label: "Historial", icon: "history", roles: ["admin"] },
   { to: "/dishes", label: "Carta", icon: "dishes", roles: ["admin", "mesero"] },
   { to: "/categories", label: "Categorías", icon: "categories", roles: ["admin"] },
   { to: "/ingredients", label: "Ingredientes", icon: "ingredients", roles: ["admin"] },
@@ -34,11 +39,44 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
       </svg>
     );
   }
+  if (name === "tables") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 8h16v3H4zM7 11v8M17 11v8M4 19h16" />
+      </svg>
+    );
+  }
   if (name === "orders") {
     return (
       <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6 3h9l3 3v15H6z" />
         <path d="M15 3v3h3M9 12h6M9 16h6" />
+      </svg>
+    );
+  }
+  if (name === "delivery") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 7h11v10H3z" />
+        <path d="M14 10h4l3 3v4h-7" />
+        <circle cx="7" cy="18" r="1.6" />
+        <circle cx="17" cy="18" r="1.6" />
+      </svg>
+    );
+  }
+  if (name === "sales") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 19V5M4 19h16" />
+        <path d="M7 15l4-5 3 3 5-7" />
+      </svg>
+    );
+  }
+  if (name === "history") {
+    return (
+      <svg className="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 4h9l3 3v13H6z" />
+        <path d="M15 4v3h3M9 12h6M9 16h4" />
       </svg>
     );
   }
@@ -183,6 +221,7 @@ export function AppLayout() {
           </div>
           <div className="topbar-actions">
             <ThemeToggle />
+            <NotificationBell />
             {user ? (
               <div className="topbar-user">
                 <img

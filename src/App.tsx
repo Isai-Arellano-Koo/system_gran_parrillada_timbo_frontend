@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { LiveProvider } from "./context/LiveContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AppLayout } from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -11,6 +12,10 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { DishRecipePage } from "./pages/DishRecipePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { OrdersPage } from "./pages/OrdersPage";
+import { TablesPage } from "./pages/TablesPage";
+import { DeliveryOrdersPage } from "./pages/DeliveryOrdersPage";
+import { SoldDishesPage } from "./pages/SoldDishesPage";
+import { OrdersHistoryPage } from "./pages/OrdersHistoryPage";
 import { KitchenPage } from "./pages/KitchenPage";
 import { UsersPage } from "./pages/UsersPage";
 import { UsersHistoryPage } from "./pages/UsersHistoryPage";
@@ -20,6 +25,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
+    <LiveProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -40,12 +46,20 @@ export default function App() {
                 <Route path="/users/historial" element={<UsersHistoryPage />} />
                 <Route path="/users/nuevo" element={<UserFormPage />} />
                 <Route path="/users/:id" element={<UserFormPage />} />
+                <Route path="/tables" element={<TablesPage />} />
+                <Route path="/historial-pedidos" element={<OrdersHistoryPage />} />
               </Route>
               <Route
                 element={<ProtectedRoute roles={["admin", "mesero"]} />}
               >
                 <Route path="/dishes" element={<DishesPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
+              </Route>
+              <Route
+                element={<ProtectedRoute roles={["admin", "cajero"]} />}
+              >
+                <Route path="/delivery" element={<DeliveryOrdersPage />} />
+                <Route path="/sales" element={<SoldDishesPage />} />
               </Route>
               <Route
                 element={
@@ -60,6 +74,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+    </LiveProvider>
     </AuthProvider>
     </ThemeProvider>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { catalogApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category } from "../types";
@@ -14,6 +15,7 @@ export function CategoriesPage() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<Category | null>(null);
 
   const load = async () => {
@@ -26,6 +28,10 @@ export function CategoriesPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["catalog"], () => {
+    load().catch(() => undefined);
+  });
 
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -54,6 +60,7 @@ export function CategoriesPage() {
           : `${created.name} registrada`
       );
       setName("");
+      setShowForm(false);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar");
@@ -113,38 +120,27 @@ export function CategoriesPage() {
           <Link className="btn btn-ghost" to="/dishes">
             Ver platos
           </Link>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setError("");
+              setOk("");
+              setName("");
+              setShowForm(true);
+            }}
+          >
+            Agregar categoría
+          </button>
         </div>
       </div>
 
-      {error ? <div className="alert alert-error">{error}</div> : null}
-      {ok ? <div className="alert alert-ok">{ok}</div> : null}
+      {error && !showForm && !removeTarget ? (
+        <div className="alert alert-error">{error}</div>
+      ) : null}
+      {ok && !showForm ? <div className="alert alert-ok">{ok}</div> : null}
 
-      <div className="grid-2">
-        <section className="panel">
-          <h2>Agregar categoría</h2>
-          <p className="page-lead">
-            Si el nombre ya existía y estaba quitado, se reactiva y se habilitan
-            otra vez sus platos.
-          </p>
-          <form className="form-grid" onSubmit={addCategory}>
-            <label>
-              Nombre
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ej. Parrillas"
-                required
-              />
-            </label>
-            <div className="form-footer">
-              <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving ? "Guardando..." : "Agregar"}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="panel">
+      <section className="panel">
           <div className="list-head">
             <div>
               <h2>Lista de categorías</h2>
@@ -153,12 +149,26 @@ export function CategoriesPage() {
                 {visible.length === 1 ? "categoría" : "categorías"}
               </p>
             </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar categoría..."
-              aria-label="Buscar categoría"
-            />
+            <div className="list-head-tools">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar categoría..."
+                aria-label="Buscar categoría"
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setError("");
+                  setOk("");
+                  setName("");
+                  setShowForm(true);
+                }}
+              >
+                Agregar categoría
+              </button>
+            </div>
           </div>
           <div className="table-wrap">
             <table>
@@ -215,8 +225,56 @@ export function CategoriesPage() {
               <div className="empty">Aún no hay categorías</div>
             ) : null}
           </div>
-        </section>
-      </div>
+      </section>
+
+      {showForm ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!saving) setShowForm(false);
+          }}
+        >
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-form-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="category-form-title">Agregar categoría</h2>
+            <p className="page-lead">
+              Si el nombre ya existía y estaba quitado, se reactiva y se habilitan
+              otra vez sus platos.
+            </p>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <form className="form-grid" onSubmit={addCategory}>
+              <label>
+                Nombre
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej. Parrillas"
+                  required
+                />
+              </label>
+              <div className="form-footer">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowForm(false)}
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving ? "Guardando..." : "Agregar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {removeTarget ? (
         <div

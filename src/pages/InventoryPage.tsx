@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLiveReload } from "../context/LiveContext";
 import { catalogApi, inventoryApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Ingredient, InventoryMovement, StockAlert } from "../types";
@@ -35,7 +36,13 @@ function toDateInput(date: Date) {
 }
 
 function movementOrderLabel(item: InventoryMovement) {
-  if (item.type !== "salida_venta") return "—";
+  if (
+    item.type !== "salida_venta" &&
+    item.type !== "devolucion" &&
+    item.type !== "merma"
+  ) {
+    return "—";
+  }
   if (item.order?.code) {
     const mesa = item.order.table?.number ?? item.order.table_id;
     return mesa
@@ -63,6 +70,9 @@ export function InventoryPage() {
   const [moveUserId, setMoveUserId] = useState("");
   const [moveFrom, setMoveFrom] = useState("");
   const [moveTo, setMoveTo] = useState("");
+  const [showEntry, setShowEntry] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
 
   const load = async () => {
     if (!token) return;
@@ -81,6 +91,10 @@ export function InventoryPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  useLiveReload(["inventory", "orders"], () => {
+    load().catch(() => undefined);
+  });
 
   const visibleStock = useMemo(() => {
     return ingredients.filter((item) => {
@@ -145,17 +159,60 @@ export function InventoryPage() {
     moveTo,
   ]);
 
+  const pendingMerma = useMemo(
+    () =>
+      movements.filter(
+        (item) => item.type === "merma" && (!item.merma_review || item.merma_review === "pendiente")
+      ),
+    [movements]
+  );
+  const pagedMerma = usePagedRows(pendingMerma, `merma|${pendingMerma.length}`);
   const pagedStock = usePagedRows(visibleStock, `${stockQuery}|${stockFilter}`);
   const pagedMoves = usePagedRows(
     visibleMoves,
     `${moveQuery}|${moveType}|${moveIngredientId}|${moveUserId}|${moveFrom}|${moveTo}`
   );
 
+  const closeEntry = () => {
+    if (saving) return;
+    setShowEntry(false);
+  };
+
+  const reviewMerma = async (
+    item: InventoryMovement,
+    action: "recuperar" | "descartar"
+  ) => {
+    if (!token) return;
+    setError("");
+    setOk("");
+    setReviewingId(item.id);
+    try {
+      await inventoryApi.reviewMerma(token, item.id, action);
+      setOk(
+        action === "recuperar"
+          ? "Ingrediente vuelto al stock"
+          : "Merma confirmada, no vuelve al stock"
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo revisar la merma");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const openEntry = () => {
+    setError("");
+    setOk("");
+    setShowEntry(true);
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setError("");
     setOk("");
+    setSaving(true);
     try {
       await inventoryApi.createEntry(token, {
         ingredient_id: Number(ingredientId),
@@ -164,9 +221,12 @@ export function InventoryPage() {
       });
       setQuantity("");
       setOk("Entrada registrada y stock actualizado");
+      setShowEntry(false);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -175,58 +235,20 @@ export function InventoryPage() {
       <div className="page-head">
         <div>
           <h1>Inventario</h1>
-          <p>Registra entradas, revisa los movimientos y las alertas de stock.</p>
+          <p>
+            Registra entradas, revisa mermas y decide si algún insumo puede
+            volver al stock.
+          </p>
         </div>
+        <button type="button" className="btn btn-primary" onClick={openEntry}>
+          Registrar entrada
+        </button>
       </div>
 
-      {error ? <div className="alert alert-error">{error}</div> : null}
-      {ok ? <div className="alert alert-ok">{ok}</div> : null}
+      {error && !showEntry ? <div className="alert alert-error">{error}</div> : null}
+      {ok && !showEntry ? <div className="alert alert-ok">{ok}</div> : null}
 
-      <div className="grid-2">
-        <section className="panel">
-          <h2>Registrar entrada</h2>
-          <form className="form-grid" onSubmit={onSubmit}>
-            <label>
-              Ingrediente
-              <select
-                value={ingredientId}
-                onChange={(e) => setIngredientId(e.target.value)}
-                required
-              >
-                <option value="">Seleccionar...</option>
-                {ingredients.map((ing) => (
-                  <option key={ing.id} value={ing.id}>
-                    {ing.name} — stock {Number(ing.stock_current)} {ing.unit}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Cantidad
-              <input
-                type="number"
-                min="0.001"
-                step="0.001"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Motivo
-              <input
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                required
-              />
-            </label>
-            <button className="btn btn-primary" type="submit">
-              Registrar entrada
-            </button>
-          </form>
-        </section>
-
-        <section className="panel">
+      <section className="panel">
           <h2>Alertas de stock mínimo</h2>
           {alerts.length === 0 ? (
             <div className="empty">Sin alertas activas</div>
@@ -256,8 +278,81 @@ export function InventoryPage() {
               </table>
             </div>
           )}
-        </section>
-      </div>
+      </section>
+
+      <section className="panel">
+        <div className="list-head">
+          <div>
+            <h2>Merma por revisar</h2>
+            <p>
+              {pendingMerma.length}{" "}
+              {pendingMerma.length === 1
+                ? "insumo pendiente"
+                : "insumos pendientes"}
+              . Recupera lo que todavía sirve o confirma que se tira.
+            </p>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Ingrediente</th>
+                <th>Cantidad</th>
+                <th>Pedido</th>
+                <th>Motivo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedMerma.rows.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    {item.created_at
+                      ? new Date(item.created_at).toLocaleString()
+                      : "—"}
+                  </td>
+                  <td>{item.ingredient?.name || item.ingredient_id}</td>
+                  <td>
+                    {Number(item.quantity)} {item.ingredient?.unit || ""}
+                  </td>
+                  <td>{movementOrderLabel(item)}</td>
+                  <td>{item.reason || "—"}</td>
+                  <td>
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={reviewingId === item.id}
+                        onClick={() => void reviewMerma(item, "recuperar")}
+                      >
+                        Volver al stock
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={reviewingId === item.id}
+                        onClick={() => void reviewMerma(item, "descartar")}
+                      >
+                        Confirmar merma
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!pendingMerma.length ? (
+            <div className="empty">No hay merma pendiente de revisión</div>
+          ) : null}
+        </div>
+        <TablePager
+          total={pendingMerma.length}
+          page={pagedMerma.current}
+          onPage={pagedMerma.setPage}
+        />
+      </section>
 
       <section className="panel">
         <div className="list-head">
@@ -267,25 +362,29 @@ export function InventoryPage() {
               {visibleStock.length} {visibleStock.length === 1 ? "insumo" : "insumos"}
             </p>
           </div>
-          <input
-            value={stockQuery}
-            onChange={(e) => setStockQuery(e.target.value)}
-            placeholder="Buscar insumo, unidad, cantidad…"
-            aria-label="Buscar stock"
-          />
         </div>
-        <div className="filter-bar">
-          <select
-            value={stockFilter}
-            onChange={(e) =>
-              setStockFilter(e.target.value as "all" | "low" | "empty")
-            }
-            aria-label="Filtrar stock"
-          >
-            <option value="all">Todo el stock</option>
-            <option value="low">Bajo mínimo</option>
-            <option value="empty">Sin stock</option>
-          </select>
+        <div className="filter-grid">
+          <label>
+            Buscar
+            <input
+              value={stockQuery}
+              onChange={(e) => setStockQuery(e.target.value)}
+              placeholder="Insumo, unidad, cantidad…"
+            />
+          </label>
+          <label>
+            Estado
+            <select
+              value={stockFilter}
+              onChange={(e) =>
+                setStockFilter(e.target.value as "all" | "low" | "empty")
+              }
+            >
+              <option value="all">Todo el stock</option>
+              <option value="low">Bajo mínimo</option>
+              <option value="empty">Sin stock</option>
+            </select>
+          </label>
         </div>
         <div className="table-wrap">
           <table>
@@ -335,72 +434,86 @@ export function InventoryPage() {
               {visibleMoves.length === 1 ? "movimiento" : "movimientos"}
             </p>
           </div>
-          <input
-            value={moveQuery}
-            onChange={(e) => setMoveQuery(e.target.value)}
-            placeholder="Buscar insumo, tipo, motivo, usuario, pedido…"
-            aria-label="Buscar movimiento"
-          />
         </div>
-        <div className="filter-bar">
-          <select
-            value={moveIngredientId}
-            onChange={(e) => setMoveIngredientId(e.target.value)}
-            aria-label="Filtrar por ingrediente"
-          >
-            <option value="">Todos los ingredientes</option>
-            {ingredients.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={moveType}
-            onChange={(e) => setMoveType(e.target.value)}
-            aria-label="Filtrar por tipo"
-          >
-            {MOVE_TYPES.map((item) => (
-              <option key={item.value || "all"} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={moveUserId}
-            onChange={(e) => setMoveUserId(e.target.value)}
-            aria-label="Filtrar por usuario"
-          >
-            <option value="">Todos los usuarios</option>
-            {moveUsers.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={moveFrom}
-            onChange={(e) => setMoveFrom(e.target.value)}
-            aria-label="Desde"
-          />
-          <input
-            type="date"
-            value={moveTo}
-            onChange={(e) => setMoveTo(e.target.value)}
-            aria-label="Hasta"
-          />
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              const today = toDateInput(startOfToday());
-              setMoveFrom(today);
-              setMoveTo(today);
-            }}
-          >
-            Hoy
-          </button>
+        <div className="filter-grid">
+          <label>
+            Buscar
+            <input
+              value={moveQuery}
+              onChange={(e) => setMoveQuery(e.target.value)}
+              placeholder="Insumo, tipo, motivo, usuario, pedido…"
+            />
+          </label>
+          <label>
+            Ingrediente
+            <select
+              value={moveIngredientId}
+              onChange={(e) => setMoveIngredientId(e.target.value)}
+            >
+              <option value="">Todos los ingredientes</option>
+              {ingredients.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Tipo
+            <select
+              value={moveType}
+              onChange={(e) => setMoveType(e.target.value)}
+            >
+              {MOVE_TYPES.map((item) => (
+                <option key={item.value || "all"} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Usuario
+            <select
+              value={moveUserId}
+              onChange={(e) => setMoveUserId(e.target.value)}
+            >
+              <option value="">Todos los usuarios</option>
+              {moveUsers.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="filter-dates">
+            <label>
+              Desde
+              <input
+                type="date"
+                value={moveFrom}
+                onChange={(e) => setMoveFrom(e.target.value)}
+              />
+            </label>
+            <label>
+              Hasta
+              <input
+                type="date"
+                value={moveTo}
+                onChange={(e) => setMoveTo(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                const today = toDateInput(startOfToday());
+                setMoveFrom(today);
+                setMoveTo(today);
+              }}
+            >
+              Hoy
+            </button>
+          </div>
         </div>
         <div className="table-wrap">
           <table>
@@ -451,6 +564,74 @@ export function InventoryPage() {
           onPage={pagedMoves.setPage}
         />
       </section>
+
+      {showEntry ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={closeEntry}
+        >
+          <div
+            className="dialog panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inventory-entry-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="inventory-entry-title">Registrar entrada</h2>
+            {error ? <div className="alert alert-error">{error}</div> : null}
+            <form className="form-grid" onSubmit={onSubmit}>
+              <label>
+                Ingrediente
+                <select
+                  value={ingredientId}
+                  onChange={(e) => setIngredientId(e.target.value)}
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {ingredients.map((ing) => (
+                    <option key={ing.id} value={ing.id}>
+                      {ing.name} — stock {Number(ing.stock_current)} {ing.unit}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cantidad
+                <input
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Motivo
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  required
+                />
+              </label>
+              <div className="form-footer">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeEntry}
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving ? "Guardando..." : "Registrar entrada"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

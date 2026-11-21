@@ -9,10 +9,15 @@ import type {
   InventoryMovement,
   KitchenTicket,
   Order,
+  OrdersHistoryResponse,
+  SoldDish,
   StockAlert,
+  TableChange,
   TableItem,
   User,
   UserStatusChange,
+  WaiterNotification,
+  WaiterNotificationList,
 } from "../types";
 
 // Llamadas al backend agrupadas por módulo
@@ -239,25 +244,117 @@ export const inventoryApi = {
   },
   listAlerts: (token: string) =>
     apiRequest<StockAlert[]>("/api/inventory/alerts", { token }),
+  reviewMerma: (
+    token: string,
+    movementId: number,
+    action: "recuperar" | "descartar"
+  ) =>
+    apiRequest<InventoryMovement>(`/api/inventory/movements/${movementId}/review`, {
+      method: "POST",
+      token,
+      body: { action },
+    }),
 };
 
 export const ordersApi = {
   listTables: (token: string) =>
     apiRequest<TableItem[]>("/api/orders/tables", { token }),
+  setTableActive: (
+    token: string,
+    tableId: number,
+    is_active: boolean,
+    reason: string
+  ) =>
+    apiRequest<TableItem>(`/api/orders/tables/${tableId}`, {
+      method: "PATCH",
+      token,
+      body: { is_active, reason },
+    }),
+  groupTables: (token: string, table_ids: number[]) =>
+    apiRequest<TableItem[]>("/api/orders/tables/groups", {
+      method: "POST",
+      token,
+      body: { table_ids },
+    }),
+  ungroupTables: (token: string, groupId: number) =>
+    apiRequest<TableItem[]>(`/api/orders/tables/groups/${groupId}`, {
+      method: "DELETE",
+      token,
+    }),
+  tableChanges: (token: string) =>
+    apiRequest<TableChange[]>("/api/orders/tables/changes", {
+      token,
+    }),
   seedTables: (token: string) =>
     apiRequest<TableItem[]>("/api/orders/tables/seed", {
       method: "POST",
       token,
     }),
-  list: (token: string) =>
-    apiRequest<Order[]>("/api/orders", { token }),
+  list: (token: string, modality?: "mesa" | "delivery" | "para_llevar" | "offsite") =>
+    apiRequest<Order[]>(
+      modality ? `/api/orders?modality=${modality}` : "/api/orders",
+      { token }
+    ),
+  history: (
+    token: string,
+    params: {
+      date?: string;
+      from?: string;
+      to?: string;
+      status?: string;
+      modality?: "mesa" | "delivery" | "para_llevar";
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (params.date) query.set("date", params.date);
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    if (params.status && params.status !== "all") {
+      query.set("status", params.status);
+    }
+    if (params.modality) query.set("modality", params.modality);
+    const suffix = query.toString();
+    return apiRequest<OrdersHistoryResponse>(
+      `/api/orders/history${suffix ? `?${suffix}` : ""}`,
+      { token }
+    );
+  },
+  soldDishes: (token: string) =>
+    apiRequest<SoldDish[]>("/api/orders/sales", { token }),
   get: (token: string, orderId: number) =>
     apiRequest<Order>(`/api/orders/${orderId}`, { token }),
   open: (token: string, table_id: number) =>
     apiRequest<Order>("/api/orders", {
       method: "POST",
       token,
+      body: { table_id, modality: "mesa" },
+    }),
+  joinTables: (token: string, from_table_id: number, to_table_id: number) =>
+    apiRequest<Order>("/api/orders/join-tables", {
+      method: "POST",
+      token,
+      body: { from_table_id, to_table_id },
+    }),
+  splitTable: (token: string, table_id: number) =>
+    apiRequest<TableItem[]>("/api/orders/split-table", {
+      method: "POST",
+      token,
       body: { table_id },
+    }),
+  openDelivery: (
+    token: string,
+    body: {
+      modality: "delivery" | "para_llevar";
+      delivery_customer_name: string;
+      delivery_phone?: string;
+      delivery_address?: string;
+      delivery_note?: string;
+    }
+  ) =>
+    apiRequest<Order>("/api/orders", {
+      method: "POST",
+      token,
+      body,
     }),
   addDetail: (
     token: string,
@@ -325,6 +422,26 @@ export const ordersApi = {
       token,
       body: { reason },
     }),
+  returnDetail: (
+    token: string,
+    orderId: number,
+    detailId: number,
+    body: { kind: "no_le_gusto" | "defecto"; note?: string }
+  ) =>
+    apiRequest<Order>(
+      `/api/orders/${orderId}/details/${detailId}/return`,
+      { method: "POST", token, body }
+    ),
+};
+
+export const notificationsApi = {
+  list: (token: string) =>
+    apiRequest<WaiterNotificationList>("/api/notifications", { token }),
+  attend: (token: string, notificationId: number) =>
+    apiRequest<WaiterNotification>(
+      `/api/notifications/${notificationId}/attend`,
+      { method: "PATCH", token }
+    ),
 };
 
 export const kitchenApi = {

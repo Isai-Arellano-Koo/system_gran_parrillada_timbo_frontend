@@ -1,12 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
+import { subscribeOpenOrder } from "../helpers/openOrder";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail, TableItem } from "../types";
-import { dishLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
-import { formatTime } from "../helpers/datetime";
+import {
+  dishLabel,
+  kitchenStatusLabel,
+  orderCodeLabel,
+  tableNumbers,
+  tablesLabel,
+} from "../types";
+import { formatDateTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
+import { useLiveReload } from "../context/LiveContext";
+import { StatusLegend } from "../components/StatusLegend";
+import {
+  CancelOrderBox,
+  ReturnDishBox,
+  canCancelOrder,
+  cancelStockHint,
+  returnKindLabel,
+  type DishReturnKind,
+} from "../components/OrderStockActions";
+import {
+  dueOf as orderDue,
+  isUnpaid,
+  kitchenTone,
+  orderTone,
+  orderToneLabel,
+  toneClass,
+} from "../helpers/orderStatus";
 
 type Shortage = {
   name: string;
@@ -19,22 +45,8 @@ function money(value: number | string) {
   return `S/ ${Number(value).toFixed(2)}`;
 }
 
-function statusLabel(status: Order["status"]) {
-  if (status === "en_edicion") return "En edición";
-  if (status === "confirmado") return "En mesa";
-  if (status === "cerrado") return "Cerrado";
-  return "Cancelado";
-}
-
-function statusClass(status: Order["status"]) {
-  if (status === "en_edicion") return "badge-edit";
-  if (status === "confirmado") return "badge-ok";
-  if (status === "cerrado") return "badge-ok";
-  return "badge-danger";
-}
-
 function dueOf(order: Order) {
-  return Math.max(0, Number(order.total) - Number(order.amount_paid || 0));
+  return orderDue(order);
 }
 
 function isSettled(order: Order) {
@@ -42,34 +54,23 @@ function isSettled(order: Order) {
 }
 
 function tableState(order?: Order) {
-  if (!order) return { label: "Libre", className: "" };
-  if (order.status === "en_edicion") {
-    return { label: "En edición", className: "occupied" };
-  }
-  const due = dueOf(order);
-  const unpaid = due > 0.009 ? " · Sin pagar" : " · Pagado";
-  const kitchen = order.kitchen_ticket?.status;
-  if (kitchen === "entregado") {
-    return {
-      label: `En mesa${unpaid}`,
-      className: `occupied dining${due > 0.009 ? " unpaid" : ""}`,
-    };
-  }
-  if (kitchen === "listo") {
-    return {
-      label: `Por entregar${unpaid}`,
-      className: `occupied ready${due > 0.009 ? " unpaid" : ""}`,
-    };
-  }
+  const tone = orderTone(order);
+  const unpaid = isUnpaid(order);
+  const label = orderToneLabel(tone, order?.modality);
+  if (!order) return { label, className: `st-band ${toneClass(tone)}` };
+  const pay = order.status === "confirmado" ? (unpaid ? " · Sin pagar" : " · Pagado") : "";
   return {
-    label: `En cocina${unpaid}`,
-    className: `occupied kitchen${due > 0.009 ? " unpaid" : ""}`,
+    label: `${label}${pay}`,
+    className: `occupied st-band ${toneClass(tone, unpaid)}`,
   };
 }
 
 function lineTotal(detail: OrderDetail) {
+  if (detail.charged === false) return 0;
   return Number(detail.unit_price) * Number(detail.quantity);
 }
+
+const TABLE_HOLD_MS = 450;
 
 function isSentToKitchen(detail: OrderDetail) {
   return detail.sent_to_kitchen === true;
@@ -77,6 +78,8 @@ function isSentToKitchen(detail: OrderDetail) {
 
 export function OrdersPage() {
   const { token, user } = useAuth();
+  const [params, setSearchParams] = useSearchParams();
+  const wantedOrder = Number(params.get("order") || 0);
   const [tables, setTables] = useState<TableItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -87,6 +90,9 @@ export function OrdersPage() {
   const [shortages, setShortages] = useState<Shortage[]>([]);
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
+  const [returnDetail, setReturnDetail] = useState<OrderDetail | null>(null);
+  const [returnKind, setReturnKind] = useState<DishReturnKind>("no_le_gusto");
+  const [returnNote, setReturnNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -104,12 +110,43 @@ export function OrdersPage() {
   const openByTable = useMemo(() => {
     const map = new Map<number, Order>();
     for (const order of orders) {
-      if (order.status === "en_edicion" || order.status === "confirmado") {
-        map.set(order.table_id, order);
-      }
+      if (order.modality !== "mesa") continue;
+      if (order.status !== "en_edicion" && order.status !== "confirmado") continue;
+      const ids = (order.tables?.length
+        ? order.tables.map((table) => table.id)
+        : order.table_id
+          ? [order.table_id]
+          : []) as number[];
+      for (const id of ids) map.set(id, order);
     }
     return map;
   }, [orders]);
+
+  const pointer = useRef<{
+    tableId: number;
+    number: number;
+    startX: number;
+    startY: number;
+    dragging: boolean;
+    armed: boolean;
+    cancelled: boolean;
+    pointerId: number;
+    pointerType: string;
+  } | null>(null);
+  const holdTimer = useRef<number | null>(null);
+  const overRef = useRef<number | null>(null);
+  const joinSourceRef = useRef<number | null>(null);
+  const nativeTouch = useRef<{
+    move: (event: TouchEvent) => void;
+    end: (event: TouchEvent) => void;
+    cancel: () => void;
+  } | null>(null);
+  const [ghost, setGhost] = useState<{ number: number; x: number; y: number } | null>(
+    null
+  );
+  const [overId, setOverId] = useState<number | null>(null);
+  const [holdingId, setHoldingId] = useState<number | null>(null);
+  const [joinSource, setJoinSource] = useState<number | null>(null);
 
   const visibleDishes = useMemo(() => {
     const list = dishes.filter((d) => d.is_active);
@@ -153,9 +190,10 @@ export function OrdersPage() {
     const id = keepId ?? activeOrder?.id;
     if (id) {
       const refreshed =
+        (await ordersApi.get(token, id).catch(() => null)) ||
         orderList.find((o) => o.id === id) ||
-        (await ordersApi.get(token, id).catch(() => null));
-      setActiveOrder(refreshed || null);
+        null;
+      setActiveOrder(refreshed);
       const nextNotes: Record<number, string> = {};
       for (const detail of refreshed?.details || []) {
         nextNotes[detail.id] = detail.observation || "";
@@ -169,6 +207,50 @@ export function OrdersPage() {
       setError(err instanceof ApiError ? err.message : "Error al cargar")
     );
   }, [token]);
+
+  const liveOrderId = useRef(activeOrder?.id);
+  liveOrderId.current = activeOrder?.id;
+  useLiveReload(["orders", "tables", "catalog", "kitchen"], () => {
+    load(liveOrderId.current).catch(() => undefined);
+  });
+
+  const applyOrderRef = useRef<(order: Order) => Promise<void>>(async () => {});
+
+  const openOrderById = (orderId: number) => {
+    if (!token || !orderId) return;
+    setError("");
+    ordersApi
+      .get(token, orderId)
+      .then((order) => applyOrderRef.current(order))
+      .then(() => setTicketOpen(true))
+      .catch((err) =>
+        setError(err instanceof ApiError ? err.message : "No se pudo abrir el pedido")
+      );
+  };
+
+  useEffect(() => {
+    if (!token || !wantedOrder) return;
+    openOrderById(wantedOrder);
+  }, [token, wantedOrder]);
+
+  useEffect(() => {
+    if (!token) return;
+    return subscribeOpenOrder((orderId) => {
+      openOrderById(orderId);
+    });
+  }, [token]);
+
+  useEffect(
+    () => () => {
+      if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
+      if (nativeTouch.current) {
+        document.removeEventListener("touchmove", nativeTouch.current.move);
+        document.removeEventListener("touchend", nativeTouch.current.end);
+        document.removeEventListener("touchcancel", nativeTouch.current.cancel);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (activeOrder) setTicketOpen(true);
@@ -207,6 +289,7 @@ export function OrdersPage() {
     }
     await load(order.id);
   };
+  applyOrderRef.current = applyOrder;
 
   const pickTable = async (table: TableItem) => {
     if (!token) return;
@@ -227,6 +310,227 @@ export function OrdersPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const joinTables = async (fromId: number, toId: number) => {
+    if (!token || fromId === toId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const order = await ordersApi.joinTables(token, fromId, toId);
+      setMessage(`${tablesLabel(order)} en un solo pedido`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudieron unir las mesas");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const splitJoinedTable = async (table: TableItem) => {
+    if (!token || !table.group_id) return;
+    setBusy(true);
+    setError("");
+    try {
+      const list = await ordersApi.splitTable(token, table.id);
+      setTables(list.filter((item) => item.is_active));
+      setMessage("Mesas separadas");
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "No se pudieron separar las mesas"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const tableFromPoint = (x: number, y: number) => {
+    const hit = document.elementFromPoint(x, y)?.closest("[data-table-id]");
+    if (!(hit instanceof HTMLElement)) return null;
+    const id = Number(hit.dataset.tableId);
+    return Number.isFinite(id) ? id : null;
+  };
+
+  const clearHoldTimer = () => {
+    if (holdTimer.current != null) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  const detachTouch = () => {
+    if (!nativeTouch.current) return;
+    document.removeEventListener("touchmove", nativeTouch.current.move);
+    document.removeEventListener("touchend", nativeTouch.current.end);
+    document.removeEventListener("touchcancel", nativeTouch.current.cancel);
+    nativeTouch.current = null;
+  };
+
+  const setJoinFrom = (tableId: number | null) => {
+    joinSourceRef.current = tableId;
+    setJoinSource(tableId);
+    setHoldingId(tableId);
+  };
+
+  const updateDragAt = (x: number, y: number) => {
+    const current = pointer.current;
+    if (!current?.armed) return;
+    const dx = x - current.startX;
+    const dy = y - current.startY;
+    if (!current.dragging && dx * dx + dy * dy < 64) return;
+    current.dragging = true;
+    setGhost({ number: current.number, x, y });
+    const hit = tableFromPoint(x, y);
+    const next = hit && hit !== current.tableId ? hit : null;
+    overRef.current = next;
+    setOverId(next);
+  };
+
+  const armDrag = () => {
+    const current = pointer.current;
+    if (!current || current.armed || current.cancelled) return;
+    current.armed = true;
+    setJoinFrom(current.tableId);
+    setMessage("Toca otra mesa para unirla");
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(12);
+    }
+  };
+
+  const finishTableGesture = async (table: TableItem, fromCancel = false) => {
+    const current = pointer.current;
+    const targetId = overRef.current;
+    const source = joinSourceRef.current;
+    pointer.current = null;
+    detachTouch();
+    clearHoldTimer();
+    overRef.current = null;
+    setGhost(null);
+    setOverId(null);
+    if (fromCancel) return;
+    if (!current) {
+      if (source != null) {
+        if (source === table.id) {
+          setJoinFrom(null);
+          setMessage("");
+          return;
+        }
+        await joinTables(source, table.id);
+        setJoinFrom(null);
+      }
+      return;
+    }
+    if (current.cancelled) return;
+    if (current.dragging) {
+      setJoinFrom(null);
+      if (targetId) await joinTables(current.tableId, targetId);
+      return;
+    }
+    if (current.pointerType === "touch" && current.armed) {
+      setJoinFrom(current.tableId);
+      return;
+    }
+    if (source != null && source !== table.id) {
+      await joinTables(source, table.id);
+      setJoinFrom(null);
+      return;
+    }
+    if (source === table.id) {
+      setJoinFrom(null);
+      setMessage("");
+      return;
+    }
+    await pickTable(table);
+  };
+
+  const onTablePointerDown = (event: PointerEvent<HTMLButtonElement>, table: TableItem) => {
+    if (event.button !== 0) return;
+    clearHoldTimer();
+    const needsHold = event.pointerType === "touch";
+    pointer.current = {
+      tableId: table.id,
+      number: table.number,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      armed: !needsHold,
+      cancelled: false,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+    };
+    if (!needsHold) return;
+    if (joinSourceRef.current == null) {
+      holdTimer.current = window.setTimeout(() => armDrag(), TABLE_HOLD_MS);
+    }
+    detachTouch();
+    const move = (touchEvent: TouchEvent) => {
+      const current = pointer.current;
+      const touch = touchEvent.touches[0];
+      if (!current || !touch) return;
+      const dx = touch.clientX - current.startX;
+      const dy = touch.clientY - current.startY;
+      if (!current.armed) {
+        if (dx * dx + dy * dy > 64) {
+          current.cancelled = true;
+          clearHoldTimer();
+        }
+        return;
+      }
+      touchEvent.preventDefault();
+      updateDragAt(touch.clientX, touch.clientY);
+    };
+    const end = () => {
+      void finishTableGesture(table);
+    };
+    const cancel = () => {
+      const current = pointer.current;
+      detachTouch();
+      clearHoldTimer();
+      setGhost(null);
+      setOverId(null);
+      if (current && !current.armed) {
+        current.cancelled = true;
+        pointer.current = null;
+      }
+    };
+    nativeTouch.current = { move, end, cancel };
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", end);
+    document.addEventListener("touchcancel", cancel);
+  };
+
+  const onTablePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const current = pointer.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    if (current.pointerType === "touch") return;
+    const dx = event.clientX - current.startX;
+    const dy = event.clientY - current.startY;
+    if (!current.dragging && dx * dx + dy * dy < 64) return;
+    if (!current.dragging) {
+      current.dragging = true;
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* captura no disponible */
+      }
+    }
+    updateDragAt(event.clientX, event.clientY);
+  };
+
+  const onTablePointerCancel = () => {
+    const current = pointer.current;
+    detachTouch();
+    clearHoldTimer();
+    setGhost(null);
+    setOverId(null);
+    if (current?.armed) return;
+    pointer.current = null;
+  };
+
+  const onTablePointerUp = async (table: TableItem) => {
+    if (pointer.current?.pointerType === "touch") return;
+    await finishTableGesture(table);
   };
 
   const addDish = async (dish: Dish) => {
@@ -323,6 +627,34 @@ export function OrdersPage() {
     }
   };
 
+  const returnDish = async () => {
+    if (!token || !activeOrder || !returnDetail) return;
+    setError("");
+    setBusy(true);
+    try {
+      const order = await ordersApi.returnDetail(
+        token,
+        activeOrder.id,
+        returnDetail.id,
+        { kind: returnKind, note: returnNote }
+      );
+      setMessage(
+        returnKind === "defecto"
+          ? "Defecto registrado. El plato no se cobra. Si lo cambias, agrégalo otra vez."
+          : "Devolución registrada. El plato se cobra igual."
+      );
+      setReturnDetail(null);
+      setReturnNote("");
+      await applyOrder(order);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "No se pudo registrar la devolución"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendAdditions = async () => {
     if (!token || !activeOrder || !unsent.length) return;
     setError("");
@@ -376,6 +708,11 @@ export function OrdersPage() {
     setShowCancel(false);
     setError("");
     setDishQuery("");
+    if (params.get("order")) {
+      const next = new URLSearchParams(params);
+      next.delete("order");
+      setSearchParams(next, { replace: true });
+    }
   };
 
   const shortageFor = (detail: OrderDetail) => {
@@ -394,6 +731,10 @@ export function OrdersPage() {
         key={detail.id}
         className={`pos-line ${alerts.length ? "warn" : ""} ${
           canChangeQty && !editing ? "pending" : ""
+        }${
+          sentLine
+            ? ` st-band ${toneClass(kitchenTone(detail.kitchen_status))}`
+            : ""
         }`}
       >
         <div className="pos-line-top">
@@ -442,6 +783,36 @@ export function OrdersPage() {
               : ""}
           </p>
         )}
+        {detail.return_kind ? (
+          <p className="muted">{returnKindLabel(detail.return_kind)}</p>
+        ) : activeOrder?.status === "confirmado" && sentLine ? (
+          returnDetail?.id === detail.id ? (
+            <ReturnDishBox
+              detail={detail}
+              kind={returnKind}
+              note={returnNote}
+              onKind={setReturnKind}
+              onNote={setReturnNote}
+              busy={busy}
+              onConfirm={() => void returnDish()}
+              onClose={() => setReturnDetail(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={() => {
+                setShowCancel(false);
+                setReturnKind("no_le_gusto");
+                setReturnNote("");
+                setReturnDetail(detail);
+              }}
+            >
+              Devolver / merma
+            </button>
+          )
+        ) : null}
         {canChangeQty ? (
           <input
             className="pos-note"
@@ -477,8 +848,8 @@ export function OrdersPage() {
           <div>
             <h1>Toma de pedidos</h1>
             <p>
-              Elige una mesa para abrir o seguir un pedido. Pensado para usar
-              desde tablet en el salón.
+              Toca una mesa para abrir el pedido. En el celular, deja presionada
+              una mesa y luego toca otra para unirlas.
             </p>
           </div>
         </div>
@@ -487,25 +858,112 @@ export function OrdersPage() {
 
         <section className="panel">
           <h2>Mesas</h2>
-          <div className="table-grid">
+          <p className="muted table-join-hint">
+            Celular o tablet: deja presionada una mesa y toca la otra. En
+            computadora puedes arrastrar una sobre otra. Si el grupo lo armaste
+            tú, puedes separarlo cuando las mesas estén libres. Los grupos de
+            administración no se separan aquí.
+          </p>
+          <StatusLegend variant="salon" />
+          {joinSource != null ? (
+            <div className="table-join-banner">
+              <span>
+                Mesa{" "}
+                {String(
+                  tables.find((item) => item.id === joinSource)?.number ?? ""
+                ).padStart(2, "0")}{" "}
+                lista. Toca otra mesa para unirla.
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setJoinFrom(null);
+                  setMessage("");
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : null}
+          <div
+            className={`table-grid${
+              ghost || holdingId || joinSource != null ? " joining" : ""
+            }`}
+          >
             {tables.map((table) => {
               const open = openByTable.get(table.id);
               const state = tableState(open);
+              const joined =
+                (table.group_numbers?.length || 0) > 1 ||
+                (open ? tableNumbers(open).length > 1 : false);
+              const canSplit =
+                Boolean(table.can_ungroup) && joined && !table.occupied && !open;
               return (
-                <button
-                  key={table.id}
-                  type="button"
-                  className={`table-tile ${state.className}`}
-                  disabled={busy}
-                  onClick={() => pickTable(table)}
-                >
-                  <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
-                  <span>{state.label}</span>
-                  {open ? <em>{money(open.total)}</em> : null}
-                </button>
+                <div key={table.id} className="table-slot">
+                  <button
+                    type="button"
+                    data-table-id={table.id}
+                    className={`table-tile ${state.className}${
+                      joined ? " joined" : ""
+                    }${overId === table.id ? " drop-target" : ""}${
+                      holdingId === table.id || joinSource === table.id
+                        ? " holding"
+                        : ""
+                    }${
+                      ghost && table.number === ghost.number ? " dragging" : ""
+                    }`}
+                    disabled={busy}
+                    onPointerDown={(event) => onTablePointerDown(event, table)}
+                    onPointerMove={onTablePointerMove}
+                    onPointerUp={() => onTablePointerUp(table)}
+                    onPointerCancel={onTablePointerCancel}
+                    onContextMenu={(event) => event.preventDefault()}
+                  >
+                    <strong>Mesa {String(table.number).padStart(2, "0")}</strong>
+                    <span>
+                      {joined
+                        ? `Con ${(
+                            open
+                              ? tableNumbers(open)
+                              : table.group_numbers || []
+                          )
+                            .filter((n) => n !== table.number)
+                            .map((n) => String(n).padStart(2, "0"))
+                            .join(" + ")} · ${state.label}`
+                        : state.label}
+                    </span>
+                    {open ? <em>{money(open.total)}</em> : null}
+                    {open ? (
+                      <em>
+                        {open.waiter?.name || "Sin mesero"} ·{" "}
+                        {formatDateTime(open.created_at)}
+                      </em>
+                    ) : null}
+                  </button>
+                  {canSplit ? (
+                    <button
+                      type="button"
+                      className="table-split"
+                      disabled={busy}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={() => void splitJoinedTable(table)}
+                    >
+                      Separar
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
+          {ghost ? (
+            <div
+              className="table-ghost"
+              style={{ left: ghost.x, top: ghost.y }}
+            >
+              Mesa {String(ghost.number).padStart(2, "0")}
+            </div>
+          ) : null}
         </section>
       </div>
     );
@@ -523,21 +981,17 @@ export function OrdersPage() {
               Mesas
             </button>
             <div>
-              <h1>
-                Toma de pedido — Mesa{" "}
-                {String(activeOrder.table?.number ?? activeOrder.table_id).padStart(
-                  2,
-                  "0"
-                )}
-              </h1>
+              <h1>Toma de pedido — {tablesLabel(activeOrder)}</h1>
               <p>
                 {editing
                   ? "Selecciona platos para agregar al ticket"
                   : "Puedes agregar más platos si piden extra"}
               </p>
             </div>
-            <span className={`badge ${statusClass(activeOrder.status)}`}>
-              {statusLabel(activeOrder.status)}
+            <span
+              className={`badge ${toneClass(orderTone(activeOrder), isUnpaid(activeOrder))}`}
+            >
+              {orderToneLabel(orderTone(activeOrder), activeOrder.modality)}
             </span>
             <button
               type="button"
@@ -651,23 +1105,34 @@ export function OrdersPage() {
             tabIndex={ticketOpen ? 0 : -1}
             onClick={() => setTicketOpen(false)}
           />
-          <aside className="pos-ticket" aria-hidden={!ticketOpen}>
+          <aside
+            className={`pos-ticket st-band ${toneClass(orderTone(activeOrder), isUnpaid(activeOrder))}`}
+            aria-hidden={!ticketOpen}
+          >
           <div className="pos-ticket-head">
             <div>
               <h2>Pedido {orderCodeLabel(activeOrder)}</h2>
               <p>
-                Mesa{" "}
-                {String(activeOrder.table?.number ?? activeOrder.table_id).padStart(
-                  2,
-                  "0"
-                )}{" "}
-                · {formatTime(activeOrder.created_at)} ·{" "}
-                {activeOrder.waiter?.name || user?.name || "Mesero"}
+                {tablesLabel(activeOrder)} · {formatDateTime(activeOrder.created_at)}{" "}
+                · {activeOrder.waiter?.name || user?.name || "Mesero"}
               </p>
+              {tableNumbers(activeOrder).length > 1 ? (
+                <div className="table-chips">
+                  {(activeOrder.tables || []).map((table) => (
+                    <span key={table.id} className="table-chip">
+                      Mesa {String(table.number).padStart(2, "0")}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="pos-ticket-head-actions">
               {activeOrder.kitchen_ticket ? (
-                <span className="muted">
+                <span
+                  className={`badge ${toneClass(
+                    kitchenTone(activeOrder.kitchen_ticket.status)
+                  )}`}
+                >
                   {kitchenStatusLabel(activeOrder.kitchen_ticket.status)}
                 </span>
               ) : null}
@@ -751,26 +1216,22 @@ export function OrdersPage() {
                 Confirmar pedido
               </button>
               {showCancel ? (
-                <div className="pos-cancel">
-                  <input
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="Motivo de cancelación"
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    disabled={busy}
-                    onClick={cancelOrder}
-                  >
-                    Confirmar cancelación
-                  </button>
-                </div>
+                <CancelOrderBox
+                  order={activeOrder}
+                  reason={cancelReason}
+                  onReason={setCancelReason}
+                  busy={busy}
+                  onConfirm={() => void cancelOrder()}
+                  onClose={() => setShowCancel(false)}
+                />
               ) : (
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => setShowCancel(true)}
+                  onClick={() => {
+                    setReturnDetail(null);
+                    setShowCancel(true);
+                  }}
                 >
                   Cancelar pedido
                 </button>
@@ -810,6 +1271,30 @@ export function OrdersPage() {
               >
                 Liberar mesa
               </button>
+              {showCancel ? (
+                <CancelOrderBox
+                  order={activeOrder}
+                  reason={cancelReason}
+                  onReason={setCancelReason}
+                  busy={busy}
+                  onConfirm={() => void cancelOrder()}
+                  onClose={() => setShowCancel(false)}
+                />
+              ) : canCancelOrder(activeOrder) ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setReturnDetail(null);
+                    setShowCancel(true);
+                  }}
+                >
+                  Cancelar pedido
+                </button>
+              ) : (
+                <p className="muted">{cancelStockHint(activeOrder)}</p>
+              )}
             </div>
           ) : activeOrder.kitchen_ticket ? (
             <p className="muted">
