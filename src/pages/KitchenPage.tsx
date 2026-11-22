@@ -281,20 +281,16 @@ export function KitchenPage() {
 
   return (
     <div>
-      <div className="page-head">
+      <div className="page-head kitchen-head">
         <div>
           <h1>Cocina</h1>
-          <p>
-            Las comandas salen en orden de llegada. También puedes agrupar por
-            plato para cocinar juntos los que coinciden.
-          </p>
           <StatusLegend variant="kitchen" />
         </div>
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
-      <section className="panel kitchen-filters">
+      <div className="kitchen-toolbar">
         <div className="page-tabs" role="tablist" aria-label="Vista de cocina">
           <button
             type="button"
@@ -315,62 +311,52 @@ export function KitchenPage() {
             Por platos
           </button>
         </div>
-        <div className="filter-grid">
-          <label>
-            Buscar
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pedido, mesa, plato, mesero…"
-            />
-          </label>
-          <label>
-            Estado
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              <option value="all">Todos</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="en_preparacion">En preparación</option>
-              <option value="listo">Listo</option>
-            </select>
-          </label>
-          <label>
-            Modalidad
-            <select
-              value={modality}
-              onChange={(e) =>
-                setModality(e.target.value as "all" | AttentionModality)
-              }
-            >
-              <option value="all">Todas</option>
-              <option value="mesa">Mesa</option>
-              <option value="delivery">Delivery</option>
-              <option value="para_llevar">Para llevar</option>
-            </select>
-          </label>
-          <label>
-            Orden
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-            >
-              <option value="entrada">Orden de entrada</option>
-              <option value="recientes">Más recientes</option>
-            </select>
-          </label>
-        </div>
-        <label className="switch kitchen-notes-filter">
-          <input
-            type="checkbox"
-            checked={notesOnly}
-            onChange={(e) => setNotesOnly(e.target.checked)}
-          />
-          <span className="switch-ui" aria-hidden="true" />
-          Solo platos con nota
-        </label>
-      </section>
+        <input
+          className="kitchen-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar pedido, mesa o plato"
+          aria-label="Buscar"
+        />
+        <select
+          aria-label="Estado"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+        >
+          <option value="all">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="en_preparacion">En preparación</option>
+          <option value="listo">Listo</option>
+        </select>
+        <select
+          aria-label="Modalidad"
+          value={modality}
+          onChange={(e) =>
+            setModality(e.target.value as "all" | AttentionModality)
+          }
+        >
+          <option value="all">Todas</option>
+          <option value="mesa">Mesa</option>
+          <option value="delivery">Delivery</option>
+          <option value="para_llevar">Para llevar</option>
+        </select>
+        <select
+          aria-label="Orden"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortMode)}
+        >
+          <option value="entrada">Por entrada</option>
+          <option value="recientes">Más recientes</option>
+        </select>
+        <button
+          type="button"
+          className={`kitchen-chip${notesOnly ? " active" : ""}`}
+          aria-pressed={notesOnly}
+          onClick={() => setNotesOnly((value) => !value)}
+        >
+          Con nota
+        </button>
+      </div>
 
       {view === "pedidos" ? (
         <>
