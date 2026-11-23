@@ -312,9 +312,23 @@ export type WaiterNotification = {
   order_code: string;
   table_label: string;
   dish_label?: string;
+  modality?: AttentionModality | null;
   generated_at: string;
   attended_at: string | null;
 };
+
+export function isOffsiteOrder(order?: { modality?: string | null } | null) {
+  return order?.modality === "delivery" || order?.modality === "para_llevar";
+}
+
+export function notificationOrderPath(item: WaiterNotification) {
+  if (isOffsiteOrder(item)) return "/delivery";
+  const label = (item.table_label || "").toLowerCase();
+  if (label.includes("delivery") || label.includes("para llevar")) {
+    return "/delivery";
+  }
+  return "/orders";
+}
 
 export type WaiterNotificationList = {
   pending: WaiterNotification[];

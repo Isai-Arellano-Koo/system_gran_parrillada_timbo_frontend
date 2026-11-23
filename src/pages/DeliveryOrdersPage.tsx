@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { subscribeOpenOrder } from "../helpers/openOrder";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
 import { ApiError } from "../api/client";
 import type { Category, Dish, Order, OrderDetail } from "../types";
-import { attentionLabel, kitchenStatusLabel, orderCodeLabel } from "../types";
+import {
+  attentionLabel,
+  isOffsiteOrder,
+  kitchenStatusLabel,
+  orderCodeLabel,
+} from "../types";
 import { formatDateTime } from "../helpers/datetime";
 import { matchesQuery } from "../helpers/search";
 import { useLiveReload } from "../context/LiveContext";
@@ -58,6 +65,9 @@ function statusClass(order: Order) {
 
 export function DeliveryOrdersPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const wantedOrder = Number(params.get("order") || 0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -177,6 +187,10 @@ export function DeliveryOrdersPage() {
   }, [activeOrder?.id]);
 
   const applyOrder = async (order: Order) => {
+    if (!isOffsiteOrder(order)) {
+      navigate(`/orders?order=${order.id}`, { replace: true });
+      return;
+    }
     setActiveOrder(order);
     const nextNotes: Record<number, string> = {};
     for (const detail of order.details || []) {
@@ -186,6 +200,32 @@ export function DeliveryOrdersPage() {
     setShowCancel(false);
     await load(order.id);
   };
+
+  const openOrderById = (orderId: number) => {
+    if (!token || !orderId) return;
+    setError("");
+    ordersApi
+      .get(token, orderId)
+      .then((order) => applyOrder(order))
+      .then(() => setTicketOpen(true))
+      .catch((err) =>
+        setError(
+          err instanceof ApiError ? err.message : "No se pudo abrir el pedido"
+        )
+      );
+  };
+
+  useEffect(() => {
+    if (!token || !wantedOrder) return;
+    openOrderById(wantedOrder);
+  }, [token, wantedOrder]);
+
+  useEffect(() => {
+    if (!token) return;
+    return subscribeOpenOrder((orderId) => {
+      openOrderById(orderId);
+    });
+  }, [token]);
 
   const createDelivery = async (e: FormEvent) => {
     e.preventDefault();

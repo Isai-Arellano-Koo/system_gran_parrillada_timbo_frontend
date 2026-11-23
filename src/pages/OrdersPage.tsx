@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { subscribeOpenOrder } from "../helpers/openOrder";
 import { useAuth } from "../context/AuthContext";
 import { catalogApi, ordersApi } from "../api/services";
@@ -9,6 +9,7 @@ import type { Category, Dish, Order, OrderDetail, TableItem } from "../types";
 import {
   dishLabel,
   kitchenStatusLabel,
+  isOffsiteOrder,
   orderCodeLabel,
   tableNumbers,
   tablesLabel,
@@ -78,6 +79,7 @@ function isSentToKitchen(detail: OrderDetail) {
 
 export function OrdersPage() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [params, setSearchParams] = useSearchParams();
   const wantedOrder = Number(params.get("order") || 0);
   const [tables, setTables] = useState<TableItem[]>([]);
@@ -276,6 +278,10 @@ export function OrdersPage() {
   };
 
   const applyOrder = async (order: Order) => {
+    if (isOffsiteOrder(order)) {
+      navigate(`/delivery?order=${order.id}`, { replace: true });
+      return;
+    }
     setActiveOrder(order);
     const nextNotes: Record<number, string> = {};
     for (const detail of order.details || []) {

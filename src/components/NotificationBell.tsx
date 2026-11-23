@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { notificationsApi } from "../api/services";
 import type { WaiterNotification, WaiterNotificationList } from "../types";
-import { orderCodeLabel } from "../types";
+import { notificationOrderPath, orderCodeLabel } from "../types";
 import { formatNotifyStamp } from "../helpers/datetime";
 import { requestOpenOrder } from "../helpers/openOrder";
 import {
@@ -135,7 +135,7 @@ export function NotificationBell() {
     void unlockNotifySound();
     setOpen(false);
     setToast(null);
-    navigate(`/orders?order=${item.order_id}`, {
+    navigate(`${notificationOrderPath(item)}?order=${item.order_id}`, {
       state: { fromNotification: item.id, at: Date.now() },
     });
     requestOpenOrder(item.order_id);
@@ -275,7 +275,11 @@ export function NotificationBell() {
                 </svg>
               </span>
               <span>
-                <strong>Plato listo para recoger</strong>
+                <strong>
+                  {toast.modality === "delivery"
+                    ? "Plato listo para envío"
+                    : "Plato listo para recoger"}
+                </strong>
                 <em>
                   {toast.dish_label || orderTitle(toast)} · {toast.table_label}
                 </em>
