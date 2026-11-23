@@ -44,9 +44,6 @@ export function UsersHistoryPage() {
         <div>
           <p className="crumb">Administración › Usuarios › Historial</p>
           <h1>Historial de cambios</h1>
-          <p>
-            Cada suspensión o reactivación queda con motivo, fecha, hora y quién la hizo.
-          </p>
         </div>
         <Link className="btn btn-ghost" to="/users">
           Volver a usuarios

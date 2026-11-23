@@ -195,11 +195,9 @@ export function HomePage() {
 
   return (
     <div className="ops-page">
-      <p className="ops-crumb">Panel / Panel operativo</p>
       <div className="page-head">
         <div>
           <h1>Panel operativo</h1>
-          <p>Resumen de salón, cocina e inventario.</p>
         </div>
       </div>
 

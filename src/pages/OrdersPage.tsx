@@ -853,10 +853,6 @@ export function OrdersPage() {
         <div className="page-head">
           <div>
             <h1>Toma de pedidos</h1>
-            <p>
-              Toca una mesa para abrir el pedido. En el celular, deja presionada
-              una mesa y luego toca otra para unirlas.
-            </p>
           </div>
         </div>
         {error ? <div className="alert alert-error">{error}</div> : null}
@@ -1171,10 +1167,7 @@ export function OrdersPage() {
                   {unsent.length ? (
                     unsent.map(renderLine)
                   ) : (
-                    <p className="muted">
-                      Si piden más, agrégalos desde la carta. Aparecerán aquí
-                      hasta enviarlos a cocina.
-                    </p>
+                    <p className="muted">Sin extras pendientes.</p>
                   )}
                 </section>
               </>

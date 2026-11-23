@@ -235,10 +235,6 @@ export function InventoryPage() {
       <div className="page-head">
         <div>
           <h1>Inventario</h1>
-          <p>
-            Registra entradas, revisa mermas y decide si algún insumo puede
-            volver al stock.
-          </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={openEntry}>
           Registrar entrada
@@ -289,7 +285,6 @@ export function InventoryPage() {
               {pendingMerma.length === 1
                 ? "insumo pendiente"
                 : "insumos pendientes"}
-              . Recupera lo que todavía sirve o confirma que se tira.
             </p>
           </div>
         </div>

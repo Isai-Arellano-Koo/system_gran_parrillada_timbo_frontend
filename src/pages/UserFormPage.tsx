@@ -151,12 +151,7 @@ export function UserFormPage() {
       <Link className="back-link" to="/users">
         ← Volver a usuarios
       </Link>
-      <h1>{editing ? "Editar usuario" : "Registrar Nuevo Usuario"}</h1>
-      <p className="page-lead">
-        {editing
-          ? "Actualiza los datos de la persona y define su acceso al panel."
-          : "Suma una persona a tu equipo. La cuenta queda deshabilitada hasta que confirme su correo."}
-      </p>
+      <h1>{editing ? "Editar usuario" : "Nuevo usuario"}</h1>
 
       {loading ? <div className="panel empty">Cargando usuario...</div> : null}
 
@@ -277,10 +272,7 @@ export function UserFormPage() {
               <div className="status-row">
                 <div>
                   <strong>Estado</strong>
-                  <p>
-                    Pendiente: la cuenta se activa cuando la persona confirma su correo en el
-                    primer ingreso.
-                  </p>
+                  <p>Confirma el correo en el primer ingreso.</p>
                 </div>
                 <span className="badge badge-warn">Pendiente</span>
               </div>
@@ -288,7 +280,7 @@ export function UserFormPage() {
               <div className="status-row">
                 <div>
                   <strong>Estado</strong>
-                  <p>Activo: puede iniciar sesión. Inactivo: acceso suspendido.</p>
+                  <p>Puede iniciar sesión</p>
                 </div>
                 <label className={`switch${active ? " on" : ""}`}>
                   <input
@@ -313,7 +305,7 @@ export function UserFormPage() {
                   onChange={(e) => setStatusReason(e.target.value)}
                   rows={3}
                   required
-                  placeholder="Queda registrado quién lo cambió, cuándo y por qué."
+                  placeholder="Motivo"
                 />
               </label>
             ) : null}
@@ -333,11 +325,7 @@ export function UserFormPage() {
           </form>
 
           <aside className="panel role-guide">
-            <h2>Un rol para cada perfil</h2>
-            <p className="lead">
-              Asigna accesos específicos para mantener la seguridad de la
-              información y ordenar el flujo de trabajo de tu equipo.
-            </p>
+            <h2>Rol</h2>
             {ROLE_OPTIONS.map((item) => (
               <button
                 type="button"
@@ -358,9 +346,6 @@ export function UserFormPage() {
                 {role === item.value ? <span className="role-check">✓</span> : <span />}
               </button>
             ))}
-            <p className="hint">
-              Puedes cambiar el rol y el estado del usuario cuando lo necesites.
-            </p>
           </aside>
         </div>
       ) : null}
@@ -370,7 +355,6 @@ export function UserFormPage() {
           <div className="list-head">
             <div>
               <h2>Historial de cambios</h2>
-              <p>Estado, motivo, fecha, hora y quién lo registró.</p>
             </div>
           </div>
           {historyError ? (

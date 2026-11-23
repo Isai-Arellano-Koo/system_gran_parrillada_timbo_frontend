@@ -162,8 +162,7 @@ export function DishRecipePage({ embedded = false }: { embedded?: boolean }) {
         <div className="page-head">
           <div>
             <p className="crumb">Administración › Carta › Recetas</p>
-            <h1>Asociación de Recetas</h1>
-            <p>Vincula ingredientes y cantidades a cada plato para el descuento de stock.</p>
+            <h1>Recetas</h1>
           </div>
           <Link className="btn btn-ghost" to="/dishes">
             Volver a fichas
@@ -176,8 +175,7 @@ export function DishRecipePage({ embedded = false }: { embedded?: boolean }) {
 
       <div className="grid-2">
         <section className="panel">
-          <h2>Selección de Plato</h2>
-          <p className="page-lead">Selecciona el plato para vincular su receta.</p>
+          <h2>Plato</h2>
 
           <label>
             Plato
@@ -205,10 +203,6 @@ export function DishRecipePage({ embedded = false }: { embedded?: boolean }) {
               disabled
             />
           </label>
-          <p className="hint">
-            La receta debe tener al menos un ingrediente y no se permiten insumos
-            duplicados.
-          </p>
 
           <form className="form-grid" onSubmit={addLine}>
             <h2>Agregar ingrediente a la receta</h2>

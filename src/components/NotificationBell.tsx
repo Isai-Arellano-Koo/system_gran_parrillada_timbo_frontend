@@ -189,7 +189,6 @@ export function NotificationBell() {
             >
               <header className="notify-head">
                 <h2>Notificaciones</h2>
-                <p>Platos listos para recoger</p>
               </header>
               <div className="notify-tabs" role="tablist">
                 <button
@@ -252,10 +251,6 @@ export function NotificationBell() {
                   ))
                 )}
               </div>
-              <p className="notify-foot">
-                Abre el pedido para atender la notificación. Abrirla no cambia la
-                comanda ni sus platos.
-              </p>
             </div>,
             document.body
           )

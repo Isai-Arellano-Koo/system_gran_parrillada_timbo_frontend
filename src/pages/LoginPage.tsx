@@ -292,7 +292,7 @@ export function LoginPage() {
       <form className="login-card" onSubmit={onSubmit}>
         <div className="login-brand">
           <img src="/LOGO_TIMBO.png" alt="Gran Parrillada Timbó" />
-          <p>Inicia sesión con tu cuenta de colaborador</p>
+            <p>Inicia sesión</p>
         </div>
 
         {error ? <div className="alert alert-error">{error}</div> : null}

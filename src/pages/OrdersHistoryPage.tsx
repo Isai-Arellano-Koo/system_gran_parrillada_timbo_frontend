@@ -172,10 +172,6 @@ export function OrdersHistoryPage() {
         <div>
           <p className="crumb">Administración › Ventas</p>
           <h1>Historial de ventas</h1>
-          <p>
-            Consulta pedidos por día o rango, distingue pendientes de
-            completados y revisa el importe del periodo.
-          </p>
         </div>
       </div>
       {error ? <div className="alert alert-error">{error}</div> : null}

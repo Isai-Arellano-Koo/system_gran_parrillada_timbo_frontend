@@ -118,10 +118,6 @@ export function TablesPage() {
       <div className="page-head">
         <div>
           <h1>Mesas del salón</h1>
-          <p>
-            Habilita, inhabilita o agrupa mesas libres. No se puede cambiar una
-            mesa con pedido abierto.
-          </p>
         </div>
         <div className="actions">
           <button

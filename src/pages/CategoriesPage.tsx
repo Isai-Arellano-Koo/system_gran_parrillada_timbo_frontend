@@ -111,10 +111,6 @@ export function CategoriesPage() {
         <div>
           <p className="crumb">Administración › Carta › Categorías</p>
           <h1>Categorías</h1>
-          <p>
-            Cada plato debe pertenecer a una categoría existente. Si quitas una,
-            sus platos quedan fuera de la carta hasta que la vuelvas a agregar.
-          </p>
         </div>
         <div className="actions">
           <Link className="btn btn-ghost" to="/dishes">

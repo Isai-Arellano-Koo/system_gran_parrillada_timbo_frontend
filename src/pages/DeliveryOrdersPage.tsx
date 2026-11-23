@@ -66,7 +66,7 @@ function statusClass(order: Order) {
 export function DeliveryOrdersPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const wantedOrder = Number(params.get("order") || 0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -145,7 +145,14 @@ export function DeliveryOrdersPage() {
     return map;
   }, [details]);
 
-  const load = async (keepId?: number) => {
+  const clearOrderQuery = () => {
+    if (!params.get("order")) return;
+    const next = new URLSearchParams(params);
+    next.delete("order");
+    setSearchParams(next, { replace: true });
+  };
+
+  const load = async (keepId?: number | null) => {
     if (!token) return;
     const [categoryList, dishList, orderList] = await Promise.all([
       catalogApi.listCategories(token, true),
@@ -155,19 +162,18 @@ export function DeliveryOrdersPage() {
     setCategories(categoryList.filter((c) => c.is_active));
     setDishes(dishList.filter((d) => d.is_active));
     setOrders(orderList);
-    const id = keepId ?? activeOrder?.id;
-    if (id) {
-      const refreshed =
-        (await ordersApi.get(token, id).catch(() => null)) ||
-        orderList.find((o) => o.id === id) ||
-        null;
-      setActiveOrder(refreshed);
-      const nextNotes: Record<number, string> = {};
-      for (const detail of refreshed?.details || []) {
-        nextNotes[detail.id] = detail.observation || "";
-      }
-      setNotes(nextNotes);
+    const id = keepId === null ? null : keepId ?? activeOrder?.id;
+    if (!id) return;
+    const refreshed =
+      (await ordersApi.get(token, id).catch(() => null)) ||
+      orderList.find((o) => o.id === id) ||
+      null;
+    setActiveOrder(refreshed);
+    const nextNotes: Record<number, string> = {};
+    for (const detail of refreshed?.details || []) {
+      nextNotes[detail.id] = detail.observation || "";
     }
+    setNotes(nextNotes);
   };
 
   useEffect(() => {
@@ -176,8 +182,10 @@ export function DeliveryOrdersPage() {
     );
   }, [token]);
 
-  const liveOrderId = useRef(activeOrder?.id);
-  liveOrderId.current = activeOrder?.id;
+  const liveOrderId = useRef<number | null>(activeOrder?.id ?? null);
+  useEffect(() => {
+    liveOrderId.current = activeOrder?.id ?? null;
+  }, [activeOrder?.id]);
   useLiveReload(["orders", "catalog", "kitchen"], () => {
     load(liveOrderId.current).catch(() => undefined);
   });
@@ -201,13 +209,27 @@ export function DeliveryOrdersPage() {
     await load(order.id);
   };
 
+  const dismissTicket = async () => {
+    liveOrderId.current = null;
+    setActiveOrder(null);
+    setShowCancel(false);
+    clearOrderQuery();
+    await load(null);
+  };
+
   const openOrderById = (orderId: number) => {
     if (!token || !orderId) return;
     setError("");
     ordersApi
       .get(token, orderId)
-      .then((order) => applyOrder(order))
-      .then(() => setTicketOpen(true))
+      .then(async (order) => {
+        if (order.status === "cerrado" || order.status === "cancelado") {
+          clearOrderQuery();
+          return;
+        }
+        await applyOrder(order);
+        setTicketOpen(true);
+      })
       .catch((err) =>
         setError(
           err instanceof ApiError ? err.message : "No se pudo abrir el pedido"
@@ -362,9 +384,8 @@ export function DeliveryOrdersPage() {
     setError("");
     try {
       await ordersApi.close(token, activeOrder.id);
+      await dismissTicket();
       setMessage("Pedido cerrado");
-      setActiveOrder(null);
-      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cerrar");
     } finally {
@@ -378,10 +399,8 @@ export function DeliveryOrdersPage() {
     setError("");
     try {
       await ordersApi.cancel(token, activeOrder.id, cancelReason);
+      await dismissTicket();
       setMessage("Pedido cancelado");
-      setActiveOrder(null);
-      setShowCancel(false);
-      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cancelar");
     } finally {
@@ -533,10 +552,6 @@ export function DeliveryOrdersPage() {
         <div className="page-head">
           <div>
             <h1>Delivery y para llevar</h1>
-            <p>
-              Pedidos sin mesa. Elige Delivery o Para llevar, agrégale platos y
-              confírmalo. Cocina ve el tipo y el inventario se descuenta igual.
-            </p>
             <StatusLegend variant="delivery" />
           </div>
           <div className="actions">
@@ -742,8 +757,7 @@ export function DeliveryOrdersPage() {
               type="button"
               className="btn btn-ghost"
               onClick={() => {
-                setActiveOrder(null);
-                load().catch(() => undefined);
+                void dismissTicket();
               }}
             >
               Pedidos

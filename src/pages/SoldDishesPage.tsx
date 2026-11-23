@@ -62,10 +62,6 @@ export function SoldDishesPage() {
       <div className="page-head">
         <div>
           <h1>Platos vendidos</h1>
-          <p>
-            Historial de platos confirmados, de mesa y delivery. Sirve para ver
-            qué se vendió y en qué modalidad.
-          </p>
         </div>
       </div>
       {error ? <div className="alert alert-error">{error}</div> : null}

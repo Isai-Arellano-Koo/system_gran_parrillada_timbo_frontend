@@ -140,7 +140,6 @@ export function IngredientsPage() {
       <div className="page-head">
         <div>
           <h1>Ingredientes</h1>
-          <p>Alta de insumos y mínimo de alerta. El stock entra por Inventario.</p>
         </div>
         <Link className="btn btn-ghost" to="/inventory">
           Ir a inventario

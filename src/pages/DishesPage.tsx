@@ -266,11 +266,9 @@ export function DishesPage() {
       {canManage ? (
         <div className="catalog-cards">
           <article className="panel catalog-card">
-            <p className="catalog-card-kicker">Platos y Precios de Venta</p>
             <h2>
               {activeCount} Platos Activos / {inactiveCount} Inactivos
             </h2>
-            <p>Registra, edita y activa platos visibles para los meseros.</p>
             <div className="actions">
               <button
                 type="button"
@@ -282,11 +280,9 @@ export function DishesPage() {
             </div>
           </article>
           <article className="panel catalog-card">
-            <p className="catalog-card-kicker">Asociación de Recetas e Ingredientes</p>
             <h2>
               {withRecipe} Recetas Configuradas / {pendingRecipe} Pendientes
             </h2>
-            <p>Configura recetas para el control automático de stock.</p>
             <div className="actions">
               <Link className="btn btn-ghost" to="/dishes/recetas">
                 Ver lista
@@ -511,7 +507,7 @@ export function DishesPage() {
               <div className="status-row">
                 <div>
                   <strong>Estado</strong>
-                  <p>Activo: el mesero lo ve. Inactivo: queda fuera de la carta.</p>
+                  <p>Visible en la carta</p>
                 </div>
                 <label className={`switch${active ? " on" : ""}`}>
                   <input
@@ -573,9 +569,6 @@ export function DishesPage() {
                 ? `Reactivar ${dishLabel(statusTarget)}`
                 : `Sacar ${dishLabel(statusTarget)} de la carta`}
             </h2>
-            <p className="page-lead">
-              El motivo queda guardado con la fecha y quién hizo el cambio.
-            </p>
             {error ? <div className="alert alert-error">{error}</div> : null}
             <label className="field">
               <span>Motivo</span>
@@ -623,12 +616,7 @@ function CatalogHeader({
     <div className="page-head catalog-head">
       <div>
         <p className="crumb">Administración › Carta</p>
-        <h1>Gestión de Carta y Menú</h1>
-        <p>
-          {canManage
-            ? "Administra los platos del restaurante y configura las recetas de cocina para el control automático de stock."
-            : "Carta activa por categoría, con precios de venta."}
-        </p>
+        <h1>Carta</h1>
         {canManage ? (
           <div className="page-tabs" role="tablist">
             <button

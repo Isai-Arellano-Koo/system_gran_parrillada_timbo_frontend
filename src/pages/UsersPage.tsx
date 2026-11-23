@@ -92,7 +92,6 @@ export function UsersPage() {
         <div>
           <p className="crumb">Administración › Usuarios</p>
           <h1>Usuarios</h1>
-          <p>Gestiona los accesos de tu equipo.</p>
         </div>
         <div className="actions">
           <Link className="btn btn-ghost" to="/users/historial">
@@ -233,9 +232,6 @@ export function UsersPage() {
                 ? `Reactivar a ${statusTarget.name}`
                 : `Suspender a ${statusTarget.name}`}
             </h2>
-            <p className="page-lead">
-              El motivo queda guardado con la fecha y quién hizo el cambio.
-            </p>
             {error ? <div className="alert alert-error">{error}</div> : null}
             <label className="field">
               <span>Motivo</span>
